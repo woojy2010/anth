@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<title>Milky-Sticky II</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="stylesheet" href="./milky.css">
+</head>
+<body>
+<canvas id="c"></canvas>
+<audio id="bgm" loop preload="auto">
+  <source src="audio/bgm.mp3" type="audio/mpeg">
+  <source src="bgm.mp3" type="audio/mpeg">
+  <source src="audio/bgm.m4a" type="audio/mp4">
+</audio>
+<input type="file" id="mp3" accept="audio/*" style="display:none">
+
+<div id="intro">
+  <div id="introIn">
+    <h1>Milky&#8209;Sticky</h1>
+    <p id="introStage" style="letter-spacing:.3em;margin-top:14px"></p>
+    <p id="introSub">—</p>
+  </div>
+</div>
+<div id="introStep">—</div>
+<div id="introBest">—</div>
+<div id="startWrap">
+  <button id="bStart">—</button>
+  <button id="bStartVR" style="display:none">—</button>
+</div>
+<div id="topLeft"><button id="bLang">EN</button></div>
+
+<div id="say" class="panel"><b>—</b><i>—</i></div>
+
+<div id="hud" class="panel">
+  <div class="row"><span class="lbl" id="lHgt">—</span><span class="val" id="hgt">0.00</span></div>
+  <div class="bar"><i id="hgtBar"></i></div>
+  <div class="row"><span class="lbl" id="lWob">—</span><span class="val" id="wob">0.0000</span></div>
+  <div class="bar"><i id="wobBar"></i></div>
+  <div class="sep"></div>
+  <div class="up">
+    <div class="row"><span class="lbl" id="lUp">—</span><span class="val" id="fUp">0.00</span></div>
+    <div class="bar"><i id="fUpBar"></i></div>
+  </div>
+  <div class="dn">
+    <div class="row"><span class="lbl" id="lDn">—</span><span class="val" id="fDn">0.00</span></div>
+    <div class="bar"><i id="fDnBar"></i></div>
+  </div>
+  <div class="row"><span class="lbl" id="lGc">—</span><span class="val" id="gc">0</span></div>
+  <div class="row"><span class="lbl" id="lLk">—</span><span class="val" id="lk">0</span></div>
+</div>
+
+<div id="zoom">
+  <button id="zIn" aria-label="+">+</button>
+  <button id="zOut" aria-label="−">−</button>
+  <button id="zFit" style="font-size:9px">—</button>
+</div>
+
+<div id="bottom">
+  <button id="bReset">—</button>
+  <button id="bDemo">—</button>
+  <button id="bSpeed">—</button>
+  <button id="bNext" style="display:none">—</button>
+</div>
+<div id="bottomR">
+  <button id="bTheme">—</button>
+  <button id="bMusic">—</button>
+  <input id="vol" type="range" min="0" max="100" value="55" aria-label="volume">
+  <button id="bVR" style="display:none">—</button>
+</div>
+
+<script>
+/* 스테이지 설정. 엔진(milky.js)은 이 값만 읽는다 — 규칙은 한 곳에만 있다.
+   중력이 셀수록 받칠 시간이 짧다. 그것이 난이도의 본체다. */
+window.MILKY_STAGE = {
+  id: 2, grav: -7.4, goalY: 4.1, goalUp: 1.35, links: 24,
+  title: 'Milky-Sticky II', flair: true,
+  next: null, prev: 'index.html'
+};
+</script>
+<script src="./three.min.js"></script>
+<script src="./milky.js"></script>
+</body>
+</html>
