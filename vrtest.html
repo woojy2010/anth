@@ -2,7 +2,7 @@
 <html lang="ko" data-theme="dark">
 <head>
 <meta charset="utf-8">
-<title>CASCADE 프로토타입 — 막대·중력·흐름</title>
+<title>Milky-Sticky</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <style>
   /* ── 색 규칙 ───────────────────────────────────────────────────────────
@@ -32,13 +32,16 @@
     backdrop-filter:blur(16px);border-radius:3px;transition:background .35s,border-color .35s}
 
   #say{position:fixed;left:50%;top:18px;transform:translateX(-50%);
-    padding:11px 20px;z-index:6;text-align:center;max-width:62vw}
+    padding:11px 20px;z-index:6;text-align:center;max-width:62vw;opacity:0;transition:opacity .3s}
+  #say.on{opacity:1}
   #say > b{display:block;font:600 13px/1.35 inherit}
   #say > i{display:block;font-style:normal;font-size:11px;line-height:1.5;color:var(--dim);margin-top:4px}
   #say i b{color:var(--txt);font-weight:600}
 
   #bottom{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);
-    display:flex;gap:6px;z-index:6;flex-wrap:wrap;justify-content:center;max-width:72vw}
+    display:flex;gap:6px;z-index:6;flex-wrap:wrap;justify-content:center;max-width:78vw;
+    opacity:0;pointer-events:none;transition:opacity .4s}
+  #bottom.on{opacity:1;pointer-events:auto}
   button{font:500 11px/1 inherit;letter-spacing:.04em;color:var(--dim);
     background:var(--panel);border:1px solid var(--line);
     padding:10px 15px;border-radius:3px;cursor:pointer;transition:.15s}
@@ -46,10 +49,14 @@
   button.on{color:var(--pure);border-color:var(--pure)}
   button:focus-visible{outline:1px solid var(--pure);outline-offset:2px}
 
-  #zoom{position:fixed;right:18px;bottom:18px;display:flex;flex-direction:column;gap:5px;z-index:6}
+  #zoom{position:fixed;right:18px;bottom:18px;display:flex;flex-direction:column;gap:5px;z-index:6;
+    opacity:0;pointer-events:none;transition:opacity .4s}
+  #zoom.on{opacity:1;pointer-events:auto}
   #zoom button{width:38px;height:38px;padding:0;font-size:15px;line-height:1}
 
-  #hud{position:fixed;right:18px;top:18px;padding:14px 15px;z-index:6;width:196px}
+  #hud{position:fixed;right:18px;top:18px;padding:14px 15px;z-index:6;width:200px;
+    opacity:0;transition:opacity .4s}
+  #hud.on{opacity:1}
   .row{display:flex;justify-content:space-between;gap:10px;align-items:baseline;margin:0 0 3px}
   .lbl{font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--dim)}
   .val{font:500 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--txt)}
@@ -66,42 +73,81 @@
   .tag.on{opacity:1}
   .tag small{display:block;font-size:9px;font-weight:400;color:var(--dim);margin-top:2px}
   .tag.call{border-color:var(--pure)}
-  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+  /* ── 인트로 ── 시작 전에는 이것만 보인다 */
+  #intro{position:fixed;inset:0;z-index:8;display:grid;place-items:center;
+    pointer-events:none;transition:opacity .5s}
+  #intro.gone{opacity:0}
+  #introIn{text-align:center;transform:translateY(-34vh)}
+  #introIn h1{font:200 32px/1 inherit;letter-spacing:.3em;margin-left:.3em;color:var(--txt);white-space:nowrap}
+  #introIn p{font-size:11px;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--dim);margin-top:12px}
+  #introStep{position:fixed;left:50%;bottom:13vh;transform:translateX(-50%);
+    font-size:11.5px;letter-spacing:.05em;color:var(--dim);text-align:center;transition:opacity .3s}
+  /* 삼각형이 닫히면 그 한가운데에서 START 가 떠오른다 */
+  #startWrap{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);
+    display:flex;flex-direction:column;gap:8px;align-items:center;z-index:9;
+    opacity:0;pointer-events:none;transition:opacity .6s}
+  #startWrap.on{opacity:1;pointer-events:auto}
+  #startWrap button{font-size:12px;letter-spacing:.22em;padding:13px 26px;
+    color:var(--pure);border-color:var(--pure);background:var(--panel)}
+  #topLeft{position:fixed;left:18px;top:18px;z-index:9;display:flex;gap:6px}
 </style>
 </head>
 <body>
 <canvas id="c"></canvas>
+<audio id="bgm" loop preload="auto">
+  <source src="audio/bgm.mp3" type="audio/mpeg">
+  <source src="bgm.mp3" type="audio/mpeg">
+  <source src="audio/bgm.m4a" type="audio/mp4">
+</audio>
+<input type="file" id="mp3" accept="audio/*" style="display:none">
+
+<div id="intro">
+  <div id="introIn">
+    <h1>Milky&#8209;Sticky</h1>
+    <p id="introSub">—</p>
+  </div>
+</div>
+<div id="introStep">—</div>
+<div id="startWrap">
+  <button id="bStart">—</button>
+  <button id="bStartVR" style="display:none">—</button>
+</div>
+<div id="topLeft"><button id="bLang">EN</button></div>
+
 <div id="say" class="panel"><b>—</b><i>—</i></div>
 
 <div id="hud" class="panel">
-  <div class="row"><span class="lbl">높이</span><span class="val" id="hgt">0.00</span></div>
+  <div class="row"><span class="lbl" id="lHgt">—</span><span class="val" id="hgt">0.00</span></div>
   <div class="bar"><i id="hgtBar"></i></div>
-  <div class="row"><span class="lbl">흔들림</span><span class="val" id="wob">0.0000</span></div>
+  <div class="row"><span class="lbl" id="lWob">—</span><span class="val" id="wob">0.0000</span></div>
   <div class="bar"><i id="wobBar"></i></div>
   <div class="sep"></div>
   <div class="up">
-    <div class="row"><span class="lbl">현장 → 정점</span><span class="val" id="fUp">0.00</span></div>
+    <div class="row"><span class="lbl" id="lUp">—</span><span class="val" id="fUp">0.00</span></div>
     <div class="bar"><i id="fUpBar"></i></div>
   </div>
   <div class="dn">
-    <div class="row"><span class="lbl">정점 → 현장</span><span class="val" id="fDn">0.00</span></div>
+    <div class="row"><span class="lbl" id="lDn">—</span><span class="val" id="fDn">0.00</span></div>
     <div class="bar"><i id="fDnBar"></i></div>
   </div>
-  <div class="row"><span class="lbl">땅에 닿은 접점</span><span class="val" id="gc">0</span></div>
+  <div class="row"><span class="lbl" id="lGc">—</span><span class="val" id="gc">0</span></div>
 </div>
 
 <div id="zoom">
-  <button id="zIn" aria-label="확대">+</button>
-  <button id="zOut" aria-label="축소">−</button>
-  <button id="zFit" style="font-size:9px">맞춤</button>
+  <button id="zIn" aria-label="+">+</button>
+  <button id="zOut" aria-label="−">−</button>
+  <button id="zFit" style="font-size:9px">—</button>
 </div>
 
 <div id="bottom">
-  <button id="bReset">다시</button>
-  <button id="bDemo">왜 흔들리지?</button>
-  <button id="bSpeed">속도 0.5×</button>
-  <button id="bTheme">라이트</button>
-  <button id="bVR" style="display:none">VR 시작</button>
+  <button id="bReset">—</button>
+  <button id="bDemo">—</button>
+  <button id="bSpeed">—</button>
+  <button id="bTheme">—</button>
+  <button id="bMusic">—</button>
+  <button id="bVR" style="display:none">—</button>
 </div>
 
 <script src="./three.min.js"></script>
@@ -110,27 +156,88 @@
 /* ───────────────────────────────────────────────────────────────────────────
    물리는 Verlet + 거리 제약(PBD). 이 해석기는 삼각형도 사면체도 모르고 거리만
    맞춘다. 그런데도 삼각형은 접히고 사면체는 안 접힌다 — 3D 에서 그게 사실이라서.
-   "사면체는 강체다" 라는 규칙을 코드로 쓰지 않았는데 게임에 존재한다.
 
    흐름은 채널 배열이다. 하향을 자금·운영·유통 3개로 늘릴 때 CHANNELS 에 항목만
-   추가하면 된다 — 계산도 렌더도 배열을 순회할 뿐이라 구조를 고치지 않는다.
+   추가하면 된다 — 계산도 렌더도 배열을 순회할 뿐이다.
 
-   VR: 모든 오브젝트는 world 그룹 안에 있다. 몰입 세션에서는 이 그룹을 축소해
-   눈앞의 탁상 모형으로 만들고, 양손 그립으로 그룹째 옮기고 키운다.
+   VR: 모든 오브젝트는 world 그룹 안에 있다. 몰입 세션에서는 그룹째 축소해
+   눈앞의 탁상 모형으로 만들고, 양손 그립으로 옮기고 키운다.
    ─────────────────────────────────────────────────────────────────────── */
 
+/* ─────────────────────────────────────── 말 (i18n) */
+var L = {
+ko: {
+  sub:'구조 · 중력 · 흐름', start:'시작', startVR:'몰입 시작', enter:'몰입 체험',
+  exitVR:'몰입 종료', reset:'다시', why:'왜 흔들리지?', back:'돌아가기',
+  speed:'속도', theme_l:'라이트', theme_d:'다크', music:'음악', musicOff:'음악 끄기',
+  fit:'맞춤', hgt:'높이', wob:'흔들림', up:'현장 → 정점', dn:'정점 → 현장',
+  gc:'땅에 닿은 접점',
+  i_place:'바닥에 점 세 개를 놓아라 — 남은 자리 {0}개',
+  i_done:'바닥이 닫혔다. 이제 이 위로 올린다',
+  b_pick:'밝은 자리를 골라 클릭하라',
+  b_pick2:'공중은 <b>올리는 수</b>, 바닥은 <b>넓히는 수</b>다. 공중에 세우면 곧바로 쓰러지기 시작한다',
+  b_fall:'쓰러지는 중', b_fall2:'<b>빛나는 점들을 클릭해 받쳐라.</b> 막대가 3개여야 멈춘다',
+  b_hinge:'아직 흔들린다',
+  b_hinge2:'막대 2개는 <b>경첩</b>이다 — 두 점을 잇는 축을 중심으로 계속 돈다. 하나 더',
+  b_lock:'잠겼다 — 흔들림이 멎었다', b_lock2:'이 점이 새 발판이 된다. 다음 자리를 골라라',
+  b_wide:'접점을 넓혔다', b_wide2:'땅에 닿은 접점이 <b>{0}개</b>. 위로 보낼 수 있는 양이 늘었다',
+  b_dead:'막다른 길', b_dead2:'막대가 닿는 범위에 받칠 점이 없다. <b>바닥부터 넓혔어야 한다</b>',
+  b_thin:'높이는 닿았는데 정보가 안 올라온다',
+  b_thin2:'접점이 <b>{0}개</b> 뿐이다. 바닥 자리를 눌러 <b>넓혀라</b>',
+  b_win:'완성 — 위아래가 통한다', b_win2:'높이 <b>{0}</b> · 상향 <b>{1}</b> · 막대 {2}개',
+  b_drop:'무너졌다', b_drop2:'막대 3개가 붙기 전에 바닥에 닿았다. <b>다시 세워보라</b>',
+  d_two:'왼쪽은 막대 2개, 오른쪽은 3개', d_two2:'가만히 두고 무슨 일이 벌어지는지 보라',
+  d_fell:'왼쪽이 무너졌다',
+  d_fell2:'막대 2개는 두 점을 잇는 축을 중심으로 <b>접힌다</b>. 오른쪽은 세 점에 이어져 접힐 방향이 아예 없다',
+  t_two:'막대 2개', t_two2:'삼각형 — 경첩', t_three:'막대 3개', t_three2:'사면체 — 강체',
+  t_prop:'받쳐라', t_prop2:'막대 {0} / 3',
+  vrfail:'몰입을 시작하지 못했다'
+},
+en: {
+  sub:'Structure · Gravity · Flow', start:'START', startVR:'ENTER VR', enter:'Immersive',
+  exitVR:'Exit VR', reset:'Restart', why:'Why wobble?', back:'Back',
+  speed:'Speed', theme_l:'Light', theme_d:'Dark', music:'Music', musicOff:'Mute',
+  fit:'Fit', hgt:'Height', wob:'Wobble', up:'Floor → Apex', dn:'Apex → Floor',
+  gc:'Ground contacts',
+  i_place:'Set three points on the ground — {0} left',
+  i_done:'The base is closed. Now build upward',
+  b_pick:'Pick a lit spot',
+  b_pick2:'In the air it <b>climbs</b>; on the ground it <b>widens</b>. Anything you raise starts falling at once',
+  b_fall:'Falling', b_fall2:'<b>Click the glowing points to prop it up.</b> It stops at three struts',
+  b_hinge:'Still wobbling',
+  b_hinge2:'Two struts make a <b>hinge</b> — it keeps swinging about the axis between them. One more',
+  b_lock:'Locked — the wobble stopped', b_lock2:'This point is now a footing. Pick the next spot',
+  b_wide:'Base widened', b_wide2:'<b>{0}</b> ground contacts now. More can travel upward',
+  b_dead:'Dead end', b_dead2:'No three points within reach. <b>You needed a wider base first</b>',
+  b_thin:'Tall enough, but nothing reaches the top',
+  b_thin2:'Only <b>{0}</b> ground contacts. Click a ground spot to <b>widen</b>',
+  b_win:'Complete — it conducts both ways', b_win2:'Height <b>{0}</b> · Upward <b>{1}</b> · {2} struts',
+  b_drop:'It collapsed', b_drop2:'It hit the ground before the third strut. <b>Try again</b>',
+  d_two:'Two struts on the left, three on the right', d_two2:'Leave them alone and watch',
+  d_fell:'The left one collapsed',
+  d_fell2:'Two struts <b>fold</b> about the axis between them. The right one reaches three points, so there is no way to fold',
+  t_two:'2 struts', t_two2:'Triangle — hinge', t_three:'3 struts', t_three2:'Tetrahedron — rigid',
+  t_prop:'Prop it', t_prop2:'{0} / 3 struts',
+  vrfail:'Could not start the immersive session'
+}};
+var lang = (navigator.language || 'en').toLowerCase().indexOf('ko') === 0 ? 'ko' : 'en';
+function t(k) {
+  var s = (L[lang] && L[lang][k]) || L.en[k] || k;
+  for (var i = 1; i < arguments.length; i++) s = s.replace('{' + (i - 1) + '}', arguments[i]);
+  return s;
+}
+
 var GRAV = -4.4, DAMP = .992, ITER = 14, GROUND = 0;
-var REACH = 2.5;                  // 막대 최대 길이. 얇게 올라가면 이것 때문에 막힌다
-var STILL = .00035;
-var timeScale = .5;
-var GOAL_Y = 2.8, GOAL_UP = 1.0;  // 클리어는 높이 + 상향 도달량. 둘 다 있어야 한다
+var REACH = 2.5, STILL = .00035, timeScale = .5;
+var GOAL_Y = 2.8, GOAL_UP = 1.0, BASE_R = 1.25;
 
 var P = [], S = [];
-var mode = 'build';
+var mode = 'build';                 // 'build' | 'demo'
+var phase = 'intro';                // 'intro' | 'play'
 
 /* ─────────────────────────────────────────────────── 물리 */
 function addPoint(x, y, z, pin) {
-  var j = pin ? 0 : .006;         // 완벽한 수직은 불안정 평형이라 안 쓰러진다
+  var j = pin ? 0 : .006;           // 완벽한 수직은 불안정 평형이라 안 쓰러진다
   P.push({ x: x, y: y, z: z, px: x + (Math.random() - .5) * j, py: y,
            pz: z + (Math.random() - .5) * j, pin: !!pin, still: 0, locked: false, born: y });
   return P.length - 1;
@@ -193,12 +300,12 @@ function avgWobble() {
   return n ? s / n : 0;
 }
 
-/* ─────────────────────────────────────── 구조 분석 · 흐름 */
+/* ─────────────────────────────────────── 흐름 */
 var CHANNELS = [
-  { id: 'up',   up: true,  hue: [.40, .52], rate: 0 },   // 청록 ~ 연두
-  { id: 'down', up: false, hue: [.80, .95], rate: 0 }    // 자홍 ~ 분홍
+  { id: 'up',   up: true,  hue: [.40, .52], rate: 0 },
+  { id: 'down', up: false, hue: [.80, .95], rate: 0 }
 ];
-var flowState = { hop: [], carry: [], groundContacts: 0, apex: -1, up: 0, down: 0, equity: 1 };
+var flowState = { hop: [], carry: [], groundContacts: 0, apex: -1, up: 0, down: 0 };
 
 function analyze() {
   var n = P.length, i, k;
@@ -241,7 +348,6 @@ function analyze() {
   // 상향은 중력을 거스른다 — 높을수록 비싸고, 밑이 넓을수록 많이 올라간다.
   var apexH = apex >= 0 ? P[apex].y : 0;
   var up = apex < 0 ? 0 : gc * .62 / (1 + apexH * .5);
-
   var eq = 1;
   if (gcList.length > 1 && apex >= 0) {
     var mn = 1e9, mx = 0;
@@ -253,8 +359,7 @@ function analyze() {
     eq = mx > 0 ? mn / mx : 1;
   }
   var down = apex < 0 ? 0 : 1.35 * (.45 + .55 * eq);
-
-  flowState = { hop: hop, carry: carry, groundContacts: gc, apex: apex, up: up, down: down, equity: eq };
+  flowState = { hop: hop, carry: carry, groundContacts: gc, apex: apex, up: up, down: down };
   CHANNELS[0].rate = up; CHANNELS[1].rate = down;
 }
 
@@ -294,13 +399,12 @@ function nearestLocked(pos) {
 }
 function computeSpots() {
   spots = [];
+  if (phase !== 'play') return;
   var locked = [], i, k;
   for (i = 0; i < P.length; i++) if (isLocked(i)) locked.push(i);
   if (!locked.length) return;
   locked.sort(function (a, b) { return P[b].y - P[a].y; });
   var cand = [];
-
-  // (1) 공중 — 사면체를 닫아 올라간다
   var dirs = [[0, 1.25, 0]];
   for (var a = 0; a < 6; a++) {
     var th = a / 6 * Math.PI * 2;
@@ -320,7 +424,7 @@ function computeSpots() {
       cand.push({ x: pos.x, y: pos.y, z: pos.z, base: sup, ground: false, score: pos.y });
     }
   }
-  // (2) 바닥 — 새 접점을 심는다. 상향 용량은 접점 수에서 나오므로 이것이 "넓히기" 다.
+  // 바닥 — 새 접점을 심는다. 상향 용량은 접점 수에서 나오므로 이것이 "넓히기" 다.
   for (i = 0; i < P.length; i++) {
     if (!P[i].pin) continue;
     var pp = P[i], rad = Math.sqrt(pp.x * pp.x + pp.z * pp.z) || 1;
@@ -347,20 +451,63 @@ function computeSpots() {
   }
 }
 
+/* ─────────────────────────────────────── 인트로 */
+// 시작 전에 바닥 삼각형을 직접 만든다. 카메라가 바로 위에 있어 화면에서는
+// 원 안에 삼각형이 그려지는 2D 도형으로 보인다 — 이 게임의 기본형이다.
+var slots = [], placed = 0;
+function setupIntro() {
+  phase = 'intro'; mode = 'build'; P = []; S = []; spots = [];
+  slots = [];
+  for (var k = 0; k < 3; k++) {
+    var a = k / 3 * Math.PI * 2 - Math.PI / 2;
+    slots.push({ x: Math.cos(a) * BASE_R, y: 0, z: Math.sin(a) * BASE_R, used: false });
+  }
+  placed = 0;
+  game.active = -1; game.won = false;
+  analyze();
+  document.getElementById('introStep').textContent = t('i_place', 3);
+}
+function placeSlot(i) {
+  if (slots[i].used) return;
+  slots[i].used = true;
+  addPoint(slots[i].x, 0, slots[i].z, true);
+  placed++;
+  var el = document.getElementById('introStep');
+  if (placed < 3) { el.textContent = t('i_place', 3 - placed); return; }
+  for (var k = 0; k < 3; k++) addStick(k, (k + 1) % 3);
+  analyze();
+  el.textContent = t('i_done');
+  document.getElementById('startWrap').classList.add('on');
+  vrStart.visible = xrOn;
+}
+function startGame() {
+  if (phase !== 'intro' || placed < 3) return;
+  phase = 'play';
+  camTween = 1;                       // 위에서 내려다보던 시점을 비스듬히 돌린다
+  document.getElementById('intro').classList.add('gone');
+  document.getElementById('introStep').style.opacity = '0';
+  document.getElementById('startWrap').classList.remove('on');
+  vrStart.visible = false;
+  ['say', 'hud'].forEach(function (id) { document.getElementById(id).classList.add('on'); });
+  ['bottom', 'zoom'].forEach(function (id) { document.getElementById(id).classList.add('on'); });
+  analyze(); computeSpots();
+  say('b_pick', 'b_pick2');
+  playMusic();
+}
+
 /* ─────────────────────────────────────── 게임 */
 var game = { active: -1, won: false };
 function setupBuild() {
-  mode = 'build'; P = []; S = [];
+  mode = 'build'; archSel = -1; P = []; S = [];
   var idx = [];
   for (var k = 0; k < 3; k++) {
     var a = k / 3 * Math.PI * 2 - Math.PI / 2;
-    idx.push(addPoint(Math.cos(a) * 1.25, 0, Math.sin(a) * 1.25, true));
+    idx.push(addPoint(Math.cos(a) * BASE_R, 0, Math.sin(a) * BASE_R, true));
   }
   addStick(idx[0], idx[1]); addStick(idx[1], idx[2]); addStick(idx[2], idx[0]);
   game.active = -1; game.won = false;
   analyze(); computeSpots();
-  say('밝은 자리를 골라 클릭하라',
-      '공중은 <b>올리는 수</b>, 바닥은 <b>넓히는 수</b>다. 공중에 세우면 곧바로 쓰러지기 시작한다');
+  say('b_pick', 'b_pick2');
   setButtons();
 }
 function supporters() {
@@ -379,30 +526,29 @@ function supporters() {
 function support(from) {
   if (game.active < 0) return;
   if (!addStick(from, game.active)) return;
-  if (stickCount(game.active) === 2)
-    say('아직 흔들린다', '막대 2개는 <b>경첩</b>이다 — 두 점을 잇는 축을 중심으로 계속 돈다. 하나 더');
+  if (stickCount(game.active) === 2) say('b_hinge', 'b_hinge2');
 }
 
 /* ─────────────────────────────────────── 비교 시연 */
 var demo = { left: -1, right: -1, said: false };
 function setupDemo() {
-  mode = 'demo'; P = []; S = [];
+  mode = 'demo'; archSel = -1; P = []; S = [];
   function tri(ox) {
-    var t = [];
+    var tt = [];
     for (var k = 0; k < 3; k++) {
       var a = k / 3 * Math.PI * 2 - Math.PI / 2;
-      t.push(addPoint(ox + Math.cos(a), 0, Math.sin(a), true));
+      tt.push(addPoint(ox + Math.cos(a), 0, Math.sin(a), true));
     }
-    addStick(t[0], t[1]); addStick(t[1], t[2]); addStick(t[2], t[0]);
-    return t;
+    addStick(tt[0], tt[1]); addStick(tt[1], tt[2]); addStick(tt[2], tt[0]);
+    return tt;
   }
-  var L = tri(-2.2), R = tri(2.2);
+  var A = tri(-2.2), B = tri(2.2);
   demo.left = addPoint(-2.2, 1.45, 0, false);
-  addStick(L[0], demo.left); addStick(L[1], demo.left);
+  addStick(A[0], demo.left); addStick(A[1], demo.left);
   demo.right = addPoint(2.2, 1.45, 0, false);
-  addStick(R[0], demo.right); addStick(R[1], demo.right); addStick(R[2], demo.right);
+  addStick(B[0], demo.right); addStick(B[1], demo.right); addStick(B[2], demo.right);
   demo.said = false; spots = []; game.active = -1;
-  say('왼쪽은 막대 2개, 오른쪽은 3개', '가만히 두고 무슨 일이 벌어지는지 보라');
+  say('d_two', 'd_two2');
   setButtons();
 }
 
@@ -410,19 +556,15 @@ function setupDemo() {
 var THEMES = {
   dark: {
     bg: 0x07080b, fog: .030, grid: [0x252b35, 0x12151c],
-    shell: [.62, .70, .86], core: [.88, .92, 1.0],      // 아주 옅은 청보라
-    stick: [.68, .73, .84], spot: [.55, .90, .84],      // 자리는 상향 네온의 옅은 판
-    goal: 0xe8ecf2, goalOp: .22,
-    blend: THREE.AdditiveBlending, pLum: .60, pOp: .95,
-    hemi: [0xaab4c4, 0x0a0b10, .95], key: .85, rim: .45
+    shell: [.62, .70, .86], core: [.88, .92, 1.0], stick: [.68, .73, .84], spot: [.55, .90, .84],
+    goal: 0xe8ecf2, goalOp: .22, blend: THREE.AdditiveBlending, pLum: .60, pOp: .95, haloOp: .17,
+    hemi: [0xaab4c4, 0x0a0b10, .95], key: .85, rim: .45, panel: 'rgba(11,13,19,.86)', ink: '#e8ecf2'
   },
   light: {
     bg: 0xeef1f6, fog: .020, grid: [0xc0c8d6, 0xdbe1ea],
-    shell: [.36, .42, .55], core: [.14, .19, .30],
-    stick: [.32, .38, .50], spot: [.05, .52, .45],
-    goal: 0x39415a, goalOp: .3,
-    blend: THREE.NormalBlending, pLum: .40, pOp: 1,
-    hemi: [0xffffff, 0x9aa4b8, 1.15], key: .55, rim: .3
+    shell: [.36, .42, .55], core: [.14, .19, .30], stick: [.32, .38, .50], spot: [.05, .52, .45],
+    goal: 0x39415a, goalOp: .3, blend: THREE.NormalBlending, pLum: .40, pOp: 1, haloOp: .10,
+    hemi: [0xffffff, 0x9aa4b8, 1.15], key: .55, rim: .3, panel: 'rgba(255,255,255,.92)', ink: '#161d2b'
   }
 };
 var themeName = (window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches) ? 'light' : 'dark';
@@ -433,12 +575,9 @@ var canvas = document.getElementById('c');
 var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
 renderer.xr.enabled = true;
-
 var scene = new THREE.Scene();
 scene.fog = new THREE.FogExp2(T.bg, T.fog);
 var camera = new THREE.PerspectiveCamera(46, 1, .1, 200);
-
-// 모든 게임 오브젝트는 여기 들어간다. VR 에서는 이 그룹을 통째로 축소·이동한다.
 var world = new THREE.Group(); scene.add(world);
 
 var hemi = new THREE.HemisphereLight(T.hemi[0], T.hemi[1], T.hemi[2]); scene.add(hemi);
@@ -456,15 +595,19 @@ var goalRing = new THREE.Mesh(new THREE.TorusGeometry(1.7, .008, 6, 80),
   new THREE.MeshBasicMaterial({ color: T.goal, transparent: true, opacity: T.goalOp }));
 goalRing.rotation.x = Math.PI / 2; world.add(goalRing);
 
-// 연결 지점 — 반투명 껍질 + 안쪽 코어. 두 겹이라 입체로 읽히고, 아주 옅게 물들어 있다.
+// 인트로의 원 — 바닥 삼각형이 이 안에 그려진다
+var baseRing = new THREE.Mesh(new THREE.TorusGeometry(BASE_R, .011, 6, 96),
+  new THREE.MeshBasicMaterial({ transparent: true, opacity: .5 }));
+baseRing.rotation.x = Math.PI / 2; baseRing.position.y = .004; world.add(baseRing);
+
 var shellGeo = new THREE.OctahedronGeometry(.185, 0);
 var coreGeo = new THREE.OctahedronGeometry(.085, 0);
 var stickGeo = new THREE.CylinderGeometry(.028, .028, 1, 6); stickGeo.translate(0, .5, 0);
 var footGeo = new THREE.RingGeometry(.2, .235, 28); footGeo.rotateX(-Math.PI / 2);
-var shells = [], cores = [], stickMeshes = [], footMeshes = [], spotMeshes = [];
+var shells = [], cores = [], stickMeshes = [], footMeshes = [], spotMeshes = [], slotMeshes = [];
 
 var timerRing = new THREE.Mesh(new THREE.TorusGeometry(.42, .012, 6, 48),
-  new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: .85 }));
+  new THREE.MeshBasicMaterial({ transparent: true, opacity: .85 }));
 timerRing.visible = false; world.add(timerRing);
 
 function makeSpot() {
@@ -481,32 +624,64 @@ function makeSpot() {
   g.userData = { shell: shell, core: core, halo: halo, beam: beam };
   world.add(g); return g;
 }
+for (var si = 0; si < 3; si++) {
+  var sg = new THREE.Group();
+  var sc2 = new THREE.Mesh(coreGeo, new THREE.MeshBasicMaterial({ transparent: true, opacity: .9 }));
+  var sh2 = new THREE.Mesh(new THREE.TorusGeometry(.3, .009, 6, 40),
+    new THREE.MeshBasicMaterial({ transparent: true, opacity: .55 }));
+  sh2.rotation.x = Math.PI / 2;
+  sg.add(sc2); sg.add(sh2);
+  sg.userData = { core: sc2, halo: sh2 };
+  world.add(sg); slotMeshes.push(sg);
+}
 
 // 파티클 — 화면에서 유일하게 진한 색. 흐르는 것만이 살아 있다.
 var PPC = 340, _hsl = new THREE.Color();
+// 점을 네모로 찍으면 알갱이가 딱딱하다. 가운데가 밝고 가장자리로 사라지는
+// 스프라이트를 쓰면 심지 바깥으로 빛이 번져 나간다.
+var GLOW = (function () {
+  var c = document.createElement('canvas'); c.width = c.height = 64;
+  var g = c.getContext('2d'), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  gr.addColorStop(0, 'rgba(255,255,255,1)');
+  gr.addColorStop(.28, 'rgba(255,255,255,.62)');
+  gr.addColorStop(.6, 'rgba(255,255,255,.16)');
+  gr.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+  return new THREE.CanvasTexture(c);
+}());
 CHANNELS.forEach(function (ch) {
   var geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(PPC * 3), 3));
   geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(PPC * 3), 3));
+  ch.geo = geo;
+  // 두 층이 같은 지오메트리를 공유한다 — 심지 하나, 그 바깥으로 크고 옅은 후광 하나.
   ch.pts = new THREE.Points(geo, new THREE.PointsMaterial({
-    size: .085, vertexColors: true, transparent: true, depthWrite: false, sizeAttenuation: true }));
-  ch.pts.frustumCulled = false;
-  world.add(ch.pts);
+    size: .1, map: GLOW, vertexColors: true, transparent: true,
+    depthWrite: false, sizeAttenuation: true }));
+  ch.halo = new THREE.Points(geo, new THREE.PointsMaterial({
+    size: .42, map: GLOW, vertexColors: true, transparent: true,
+    depthWrite: false, sizeAttenuation: true, opacity: .16 }));
+  ch.pts.frustumCulled = ch.halo.frustumCulled = false;
+  ch.halo.renderOrder = -1;
+  world.add(ch.halo); world.add(ch.pts);
   ch.items = [];
   for (var i = 0; i < PPC; i++) ch.items.push({ s: -1, t: 0, h: Math.random() });
 });
 function paintParticles() {
   CHANNELS.forEach(function (ch) {
-    var col = ch.pts.geometry.attributes.color.array;
+    var col = ch.geo.attributes.color.array;
     for (var i = 0; i < PPC; i++) {
       // 파티클마다 채널 색상대 안에서 색이 흩어진다 — "다양한 네온색"
       _hsl.setHSL(ch.hue[0] + ch.items[i].h * (ch.hue[1] - ch.hue[0]), 1, T.pLum);
       col[i * 3] = _hsl.r; col[i * 3 + 1] = _hsl.g; col[i * 3 + 2] = _hsl.b;
     }
-    ch.pts.geometry.attributes.color.needsUpdate = true;
+    ch.geo.attributes.color.needsUpdate = true;
     ch.pts.material.blending = T.blend;
     ch.pts.material.opacity = T.pOp;
     ch.pts.material.needsUpdate = true;
+    ch.halo.material.blending = T.blend;
+    ch.halo.material.opacity = T.haloOp;
+    ch.halo.material.needsUpdate = true;
   });
 }
 function applyTheme(name) {
@@ -517,8 +692,8 @@ function applyTheme(name) {
   hemi.color.setHex(T.hemi[0]); hemi.groundColor.setHex(T.hemi[1]); hemi.intensity = T.hemi[2];
   key.intensity = T.key; rim.intensity = T.rim;
   goalRing.material.color.setHex(T.goal); goalRing.material.opacity = T.goalOp;
-  buildGrid(); paintParticles();
-  document.getElementById('bTheme').textContent = name === 'dark' ? '라이트' : '다크';
+  buildGrid(); paintParticles(); drawVRStart();
+  document.getElementById('bTheme').textContent = name === 'dark' ? t('theme_l') : t('theme_d');
 }
 
 var UP = new THREE.Vector3(0, 1, 0);
@@ -528,7 +703,7 @@ function syncParticles(dt) {
   var carrying = [];
   for (var i = 0; i < S.length; i++) if (flowState.carry[i]) carrying.push(i);
   CHANNELS.forEach(function (ch) {
-    var pos = ch.pts.geometry.attributes.position.array;
+    var pos = ch.geo.attributes.position.array;
     var want = Math.min(PPC, Math.round(ch.rate * 140));
     for (var i = 0; i < PPC; i++) {
       var it = ch.items[i];
@@ -546,13 +721,27 @@ function syncParticles(dt) {
       pos[i * 3 + 1] = f.y + (g.y - f.y) * u;
       pos[i * 3 + 2] = f.z + (g.z - f.z) * u;
     }
-    ch.pts.geometry.attributes.position.needsUpdate = true;
+    ch.geo.attributes.position.needsUpdate = true;
   });
 }
 
-function syncMeshes(t) {
+function syncMeshes(tm) {
   var i, sup = supporters(), isSup = {};
   sup.forEach(function (k) { isSup[k] = true; });
+
+  baseRing.visible = (phase === 'intro');
+  baseRing.material.color.setRGB(T.spot[0], T.spot[1], T.spot[2]);
+  for (i = 0; i < 3; i++) {
+    var on2 = (phase === 'intro') && !slots[i].used;
+    slotMeshes[i].visible = on2;
+    if (!on2) continue;
+    slotMeshes[i].position.set(slots[i].x, .05, slots[i].z);
+    var pl = 1 + Math.sin(tm * 3.4 + i * 2.1) * .18;
+    slotMeshes[i].userData.core.scale.setScalar(pl * 1.3);
+    slotMeshes[i].userData.halo.scale.setScalar(pl);
+    slotMeshes[i].userData.core.material.color.setRGB(T.spot[0], T.spot[1], T.spot[2]);
+    slotMeshes[i].userData.halo.material.color.setRGB(T.spot[0], T.spot[1], T.spot[2]);
+  }
 
   while (shells.length < P.length) {
     var sh = new THREE.Mesh(shellGeo, new THREE.MeshStandardMaterial({
@@ -573,17 +762,16 @@ function syncMeshes(t) {
     var p = P[i];
     shells[i].position.set(p.x, p.y, p.z);
     cores[i].position.set(p.x, p.y, p.z);
-    shells[i].rotation.y = t * .25 + i;      // 아주 느린 자전 — 정지 화면이 되지 않게
-    cores[i].rotation.y = -t * .35 + i;      // 반대로 돌아 두 겹이 분리돼 보인다
+    shells[i].rotation.y = tm * .25 + i;       // 두 겹이 반대로 돌아 입체로 읽힌다
+    cores[i].rotation.y = -tm * .35 + i;
     // 상태는 색상이 아니라 밝기·투명도·크기로 말한다. 진한 색은 흐름만 가진다.
     var lum = 1, op = .34, sc = 1;
     if (p.pin) { lum = 1.05; op = .42; }
     if (isLocked(i) && !p.pin) { lum = 1.18; op = .5; }
     if (!p.pin && !isLocked(i)) { lum = .8; op = .34; sc = 1.12; }
-    if (isSup[i]) { lum = 1.5; op = .95; sc = 1.45 + Math.sin(t * 7) * .2; }
+    if (isSup[i]) { lum = 1.5; op = .95; sc = 1.45 + Math.sin(tm * 7) * .2; }
     shells[i].material.color.setRGB(T.shell[0] * lum, T.shell[1] * lum, T.shell[2] * lum);
-    shells[i].material.opacity = op;
-    shells[i].scale.setScalar(sc);
+    shells[i].material.opacity = op; shells[i].scale.setScalar(sc);
     cores[i].material.color.setRGB(T.core[0] * lum, T.core[1] * lum, T.core[2] * lum);
     cores[i].material.opacity = Math.min(1, op * 2.1);
     cores[i].scale.setScalar(sc * (isSup[i] ? 1.3 : 1));
@@ -602,14 +790,13 @@ function syncMeshes(t) {
   for (i = 0; i < stickMeshes.length; i++) {
     var v = i < S.length; stickMeshes[i].visible = v;
     if (!v) continue;
-    var A = P[S[i].a], B = P[S[i].b];
-    _a.set(A.x, A.y, A.z); _b.set(B.x, B.y, B.z); _d.subVectors(_b, _a);
+    var A2 = P[S[i].a], B2 = P[S[i].b];
+    _a.set(A2.x, A2.y, A2.z); _b.set(B2.x, B2.y, B2.z); _d.subVectors(_b, _a);
     var sk = stickMeshes[i];
     sk.position.copy(_a);
     sk.quaternion.setFromUnitVectors(UP, _d.clone().normalize());
     sk.scale.set(1, _d.length(), 1);
-    // 흔들리는 막대는 어두워진다 — 아직 제 몫을 못 한다는 뜻
-    var mv = Math.max(A.pin ? 0 : speed(A), B.pin ? 0 : speed(B));
+    var mv = Math.max(A2.pin ? 0 : speed(A2), B2.pin ? 0 : speed(B2));
     var calm = 1 - Math.min(1, mv * 55);
     var g2 = .62 + calm * .5;
     sk.material.color.setRGB(T.stick[0] * g2, T.stick[1] * g2, T.stick[2] * g2);
@@ -623,15 +810,15 @@ function syncMeshes(t) {
     if (!on) continue;
     var g3 = spots[i], u = spotMeshes[i].userData;
     spotMeshes[i].position.set(g3.x, g3.y, g3.z);
-    var pulse = 1 + Math.sin(t * 3.2 + i * 1.3) * .12;
+    var pulse = 1 + Math.sin(tm * 3.2 + i * 1.3) * .12;
     [u.shell, u.core, u.halo, u.beam].forEach(function (m) {
       m.material.color.setRGB(T.spot[0], T.spot[1], T.spot[2]);
     });
     u.shell.visible = u.core.visible = !g3.ground;
-    u.shell.scale.setScalar(pulse); u.shell.rotation.y = t * .5 + i;
+    u.shell.scale.setScalar(pulse); u.shell.rotation.y = tm * .5 + i;
     u.core.scale.setScalar(pulse);
     u.halo.scale.setScalar(g3.ground ? pulse * 1.9 : pulse * 1.08);
-    u.halo.rotation.z = t * .6 + i;
+    u.halo.rotation.z = tm * .6 + i;
     u.beam.visible = !g3.ground;
     if (!g3.ground) u.beam.scale.set(1, Math.max(g3.y, .01), 1);
   }
@@ -647,14 +834,96 @@ function syncMeshes(t) {
     timerRing.material.color.setRGB(T.spot[0], T.spot[1], T.spot[2]);
     timerRing.material.opacity = .3 + (1 - left) * .6;
   }
+  goalRing.visible = (mode === 'build' && phase === 'play');
 }
 
-/* ─────────────────────────── 카메라 (데스크톱) */
-var orbit = { yaw: .5, pitch: .2, dist: 11, ty: 1.2 };
-var fitDist = 11, fitTy = 1.2, userZoom = 1;
+
+/* ─────────────────────────────────────── 완성작 보관대 (왼쪽) */
+// 완성한 구조를 왼쪽에 입체로 세워 둔다. 누르면 커져서 돌아가고, 다시 누르면
+// 제자리로 간다. world 그룹 안에 있으므로 VR 에서도 그대로 손에 잡힌다.
+var archive = [], archMeshes = [], archSel = -1;
+var ARCH_MAX = 6, ARCH_X = -4.3;
+
+function loadArchive() {
+  try { var v = localStorage.getItem('milkysticky.archive'); if (v) archive = JSON.parse(v) || []; }
+  catch (e) { archive = []; }
+}
+function persistArchive() {
+  try { localStorage.setItem('milkysticky.archive', JSON.stringify(archive)); } catch (e) {}
+}
+function snapshot() {
+  return {
+    pts: P.map(function (p) { return { x: +p.x.toFixed(3), y: +p.y.toFixed(3), z: +p.z.toFixed(3), pin: p.pin }; }),
+    sticks: S.map(function (st) { return [st.a, st.b]; }),
+    h: +maxY().toFixed(2), up: +flowState.up.toFixed(2), gc: flowState.groundContacts, n: S.length
+  };
+}
+function archiveCurrent() {
+  archive.unshift(snapshot());
+  while (archive.length > ARCH_MAX) archive.pop();
+  persistArchive(); buildArchMeshes();
+}
+function disposeArch() {
+  archMeshes.forEach(function (g) {
+    world.remove(g);
+    g.traverse(function (o) {
+      if (o.geometry) o.geometry.dispose();
+      if (o.material) o.material.dispose();
+    });
+  });
+  archMeshes = [];
+}
+function buildArchMeshes() {
+  disposeArch();
+  for (var i = 0; i < archive.length; i++) {
+    var rec = archive[i], g = new THREE.Group(), lp = [], k;
+    for (k = 0; k < rec.sticks.length; k++) {
+      var a = rec.pts[rec.sticks[k][0]], b = rec.pts[rec.sticks[k][1]];
+      if (!a || !b) continue;
+      lp.push(new THREE.Vector3(a.x, a.y, a.z), new THREE.Vector3(b.x, b.y, b.z));
+    }
+    var lines = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(lp),
+      new THREE.LineBasicMaterial({ transparent: true, opacity: .8 }));
+    var jp = [];
+    for (k = 0; k < rec.pts.length; k++) jp.push(new THREE.Vector3(rec.pts[k].x, rec.pts[k].y, rec.pts[k].z));
+    var pts = new THREE.Points(new THREE.BufferGeometry().setFromPoints(jp),
+      new THREE.PointsMaterial({ size: .5, map: GLOW, transparent: true, opacity: .85,
+                                 depthWrite: false, sizeAttenuation: true }));
+    var plinth = new THREE.Mesh(new THREE.TorusGeometry(1.5, .03, 6, 48),
+      new THREE.MeshBasicMaterial({ transparent: true, opacity: .3 }));
+    plinth.rotation.x = Math.PI / 2;
+    g.add(lines); g.add(pts); g.add(plinth);
+    g.userData = { lines: lines, pts: pts, plinth: plinth, rec: rec, spin: 0 };
+    world.add(g); archMeshes.push(g);
+  }
+}
+function archTarget(i) {
+  if (i === archSel) return { x: ARCH_X - 1.1, y: 1.7, s: .62 };
+  return { x: ARCH_X, y: .35 + i * 1.15, s: .2 };
+}
+function syncArchive(tm, dt) {
+  for (var i = 0; i < archMeshes.length; i++) {
+    var g = archMeshes[i], tg = archTarget(i);
+    g.position.x += (tg.x - g.position.x) * .12;
+    g.position.y += (tg.y - g.position.y) * .12;
+    var cur = g.scale.x + (tg.s - g.scale.x) * .12;
+    g.scale.setScalar(cur);
+    g.userData.spin += dt * (i === archSel ? .55 : .12);
+    g.rotation.y = g.userData.spin;
+    g.userData.lines.material.color.setRGB(T.stick[0] * 1.1, T.stick[1] * 1.1, T.stick[2] * 1.1);
+    g.userData.pts.material.color.setRGB(T.spot[0], T.spot[1], T.spot[2]);
+    g.userData.plinth.material.color.setRGB(T.shell[0], T.shell[1], T.shell[2]);
+    g.visible = (phase === 'play');
+  }
+}
+
+/* ─────────────────────────── 카메라 */
+var orbit = { yaw: .5, pitch: 1.5, dist: 5.4, ty: 0 };
+var fitDist = 5.4, fitTy = 0, userZoom = 1, camTween = 0;
 var pan = { x: 0, y: 0 };
 var _fwd = new THREE.Vector3(), _right = new THREE.Vector3(), _cup = new THREE.Vector3();
 function autoFrame() {
+  if (phase === 'intro') { fitDist = 5.4; fitTy = 0; return; }
   if (!P.length) return;
   var minY = 1e9, maxYv = -1e9, maxR = 0, i;
   for (i = 0; i < P.length; i++) {
@@ -669,6 +938,12 @@ function autoFrame() {
     var gr = Math.sqrt(spots[i].x * spots[i].x + spots[i].z * spots[i].z);
     if (gr > maxR) maxR = gr;
   }
+  if (archMeshes.length) {                 // 보관대도 화면에 담는다
+    var ax = Math.abs(ARCH_X) + 1.2;
+    if (ax > maxR) maxR = ax;
+    var ay = .35 + (archMeshes.length - 1) * 1.15 + .8;
+    if (ay > maxYv) maxYv = ay;
+  }
   var halfH = Math.max((maxYv - minY) / 2, .9) + .7;
   var halfW = maxR + 1.0;
   var vFov = camera.fov * Math.PI / 180;
@@ -676,7 +951,13 @@ function autoFrame() {
   fitDist = Math.max(halfH / (Math.tan(vFov / 2) * .78), halfW / Math.tan(hFov / 2)) + .7;
   fitTy = (minY + maxYv) / 2;
 }
-function placeCamera() {
+function placeCamera(dt) {
+  // 시작을 누르면 위에서 내려다보던 시점이 비스듬한 시점으로 넘어간다
+  if (camTween > 0) {
+    camTween = Math.max(0, camTween - dt / 1.5);
+    var e = 1 - Math.pow(camTween, 2);
+    orbit.pitch = 1.5 + (.2 - 1.5) * e;
+  }
   orbit.dist += (fitDist * userZoom - orbit.dist) * .1;
   orbit.ty += (fitTy - orbit.ty) * .1;
   var cp = Math.cos(orbit.pitch);
@@ -685,11 +966,13 @@ function placeCamera() {
   var oz = Math.cos(orbit.yaw) * cp * orbit.dist;
   _fwd.set(-ox, -oy, -oz).normalize();
   _right.crossVectors(_fwd, UP).normalize();
+  if (_right.lengthSq() < 1e-6) _right.set(1, 0, 0);   // 정수직에서 축이 무너지는 것 방지
   _cup.crossVectors(_right, _fwd).normalize();
   var tx = _right.x * pan.x + _cup.x * pan.y;
   var ty = orbit.ty + _right.y * pan.x + _cup.y * pan.y;
   var tz = _right.z * pan.x + _cup.z * pan.y;
   camera.position.set(tx + ox, ty + oy, tz + oz);
+  camera.up.set(0, 1, 0);
   camera.lookAt(tx, ty, tz);
 }
 
@@ -697,8 +980,6 @@ function placeCamera() {
 var ray = new THREE.Raycaster();
 var _inv = new THREE.Matrix4(), _rot = new THREE.Matrix4();
 function toWorldLocal() {
-  // P[] 좌표는 world 그룹의 로컬 좌표계다. VR 에서 그룹을 축소·이동하므로
-  // 광선을 그 좌표계로 되돌려야 거리 판정이 맞는다. 데스크톱에서는 항등이다.
   world.updateMatrixWorld();
   _inv.copy(world.matrixWorld).invert();
   ray.ray.applyMatrix4(_inv);
@@ -724,6 +1005,27 @@ function nearestSpotRay() {
 }
 // 마우스든 컨트롤러든 여기로 들어온다. 규칙이 한 곳에만 있다.
 function act() {
+  // 왼쪽 보관대를 먼저 본다. 누르면 커지고, 다시 누르면 제자리로.
+  if (phase === 'play') {
+    for (var ai = 0; ai < archMeshes.length; ai++) {
+      _a.copy(archMeshes[ai].position);
+      if (ray.ray.distanceToPoint(_a) < (ai === archSel ? 1.3 : .72)) {
+        archSel = (ai === archSel) ? -1 : ai;
+        return;
+      }
+    }
+  }
+  if (phase === 'intro') {
+    var bi = -1, bd = 1e9;
+    for (var i = 0; i < 3; i++) {
+      if (slots[i].used) continue;
+      _a.set(slots[i].x, slots[i].y, slots[i].z);
+      var d = ray.ray.distanceToPoint(_a);
+      if (d < bd) { bd = d; bi = i; }
+    }
+    if (bi >= 0) placeSlot(bi);
+    return;
+  }
   if (mode !== 'build') return;
   if (game.active >= 0) {
     var sup = supporters();
@@ -731,24 +1033,22 @@ function act() {
     if (pick >= 0) support(pick); else if (sup.length) support(sup[0]);
     return;
   }
-  var si = nearestSpotRay();
-  if (si < 0) return;
-  var g = spots[si];
+  var s = nearestSpotRay();
+  if (s < 0) return;
+  var g = spots[s];
   if (g.ground) {
     var gi = addPoint(g.x, 0, g.z, true);
     addStick(g.base[0], gi);
     analyze(); computeSpots();
-    say('접점을 넓혔다',
-        '땅에 닿은 접점이 <b>' + flowState.groundContacts + '개</b>. 위로 보낼 수 있는 양이 늘었다');
+    say('b_wide', 'b_wide2', flowState.groundContacts);
     return;
   }
   var ni = addPoint(g.x, g.y, g.z, false);
-  // 첫 막대를 어디에 거는지는 조준 방향이 정한다 — 매달린 지점이 다르면
-  // 쓰러지는 방향도 달라진다.
+  // 첫 막대를 어디에 거는지는 조준 방향이 정한다 — 쓰러지는 방향이 달라진다
   var anchor = nearestOfRay(g.base, 1e9);
   addStick(anchor >= 0 ? anchor : g.base[0], ni);
   game.active = ni; spots = [];
-  say('쓰러지는 중', '<b>빛나는 점들을 클릭해 받쳐라.</b> 막대가 3개여야 멈춘다');
+  say('b_fall', 'b_fall2');
 }
 
 var pointers = {}, nPointers = 0, gesture = null;
@@ -778,6 +1078,7 @@ canvas.addEventListener('pointermove', function (e) {
     press.moved = 999;
     return;
   }
+  if (phase === 'intro') return;              // 인트로에서는 시점을 고정한다
   var ddx = e.clientX - press.x, ddy = e.clientY - press.y;
   press.moved += Math.abs(ddx) + Math.abs(ddy);
   orbit.yaw -= ddx * .007;
@@ -799,28 +1100,84 @@ canvas.addEventListener('pointerup', function (e) {
 canvas.addEventListener('pointercancel', endPointer);
 canvas.addEventListener('wheel', function (e) {
   e.preventDefault();
+  if (phase === 'intro') return;
   if (e.ctrlKey) userZoom = Math.max(.35, Math.min(4, userZoom * (1 + e.deltaY * .01)));
   else if (Math.abs(e.deltaX) > .5) {
     pan.x += e.deltaX * panScale() * .9; pan.y -= e.deltaY * panScale() * .9;
   } else userZoom = Math.max(.35, Math.min(4, userZoom * (1 + e.deltaY * .0016)));
 }, { passive: false });
 
+/* ─────────────────────────────────────── 음악 */
+var bgm = document.getElementById('bgm');
+var musicWanted = true, srcOK = false, musicArmed = false;
+bgm.volume = .55;
+// <source> 를 여러 개 두면 브라우저가 순서대로 시도한다. 어느 하나라도 열리면 여기 걸린다.
+bgm.addEventListener('canplay', function () { srcOK = true; setButtons(); });
+bgm.addEventListener('error', function () { srcOK = false; setButtons(); }, true);
+
+function playMusic() {
+  if (!musicWanted) return;
+  var pr = bgm.play();
+  if (pr && pr.catch) pr.catch(function () {});   // 자동재생 차단은 조용히 넘긴다
+}
+// 브라우저는 사용자 동작 뒤에만 소리를 허용한다. 첫 화면의 첫 클릭이 그 동작이다 —
+// 시작 버튼까지 기다리지 않고 그때 바로 튼다.
+function armMusic() {
+  if (musicArmed) return;
+  musicArmed = true;
+  playMusic();
+}
+addEventListener('pointerdown', armMusic, true);
+addEventListener('keydown', armMusic, true);
+playMusic();                                       // 정책이 허용하면 즉시 재생
+
+document.getElementById('mp3').addEventListener('change', function (e) {
+  var f = e.target.files && e.target.files[0];
+  if (!f) return;
+  bgm.src = URL.createObjectURL(f);
+  srcOK = true; musicWanted = true; musicArmed = true;
+  playMusic(); setButtons();
+});
+document.getElementById('bMusic').onclick = function () {
+  if (!bgm.paused) { bgm.pause(); musicWanted = false; setButtons(); return; }
+  musicWanted = true; musicArmed = true;
+  // 파일을 못 읽은 것과 자동재생이 막힌 것은 다른 문제다. 전자일 때만 고르게 한다.
+  if (!srcOK) { document.getElementById('mp3').click(); return; }
+  playMusic(); setButtons();
+};
+
 /* ─────────────────────────────────────── VR */
 var xrOn = false, xrSession = null, grab = null;
+// 몰입 중에는 DOM 이 안 보이므로 시작 버튼을 3D 로 만든다
+var vrCv = document.createElement('canvas'); vrCv.width = 512; vrCv.height = 256;
+var vrTex = new THREE.CanvasTexture(vrCv);
+var vrStart = new THREE.Mesh(new THREE.PlaneGeometry(.6, .3),
+  new THREE.MeshBasicMaterial({ map: vrTex, transparent: true }));
+vrStart.position.set(0, 1.35, -1.1); vrStart.visible = false; scene.add(vrStart);
+function drawVRStart() {
+  var g = vrCv.getContext('2d');
+  g.clearRect(0, 0, 512, 256);
+  g.fillStyle = T.panel; g.fillRect(0, 0, 512, 256);
+  g.strokeStyle = T.ink; g.lineWidth = 3; g.strokeRect(2, 2, 508, 252);
+  g.fillStyle = T.ink; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.font = '600 62px ui-sans-serif, system-ui, sans-serif';
+  g.fillText(t('start'), 256, 128);
+  vrTex.needsUpdate = true;
+}
 var ctrls = [renderer.xr.getController(0), renderer.xr.getController(1)];
 ctrls.forEach(function (c) {
   var g = new THREE.BufferGeometry().setFromPoints(
     [new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, -1)]);
   var line = new THREE.Line(g, new THREE.LineBasicMaterial({ transparent: true, opacity: .55 }));
-  line.scale.z = 4;
-  c.add(line);
+  line.scale.z = 4; c.add(line);
   c.userData.squeeze = false;
   scene.add(c);
   c.addEventListener('selectstart', function (e) {
-    // 컨트롤러 광선을 world 로컬 좌표계로 되돌려 마우스와 같은 처리를 탄다
     _rot.identity().extractRotation(e.target.matrixWorld);
     ray.ray.origin.setFromMatrixPosition(e.target.matrixWorld);
     ray.ray.direction.set(0, 0, -1).applyMatrix4(_rot).normalize();
+    // 3D 시작 버튼이 떠 있으면 그것부터 본다
+    if (vrStart.visible && ray.intersectObject(vrStart, false).length) { startGame(); return; }
     toWorldLocal();
     act();
   });
@@ -828,83 +1185,122 @@ ctrls.forEach(function (c) {
   c.addEventListener('squeezeend', function (e) { e.target.userData.squeeze = false; grab = null; });
 });
 var _p0 = new THREE.Vector3(), _p1 = new THREE.Vector3(), _mid = new THREE.Vector3();
-
 function updateGrab() {
   // 양손 그립 = 세계를 잡는다. 벌리면 커지고, 나란히 옮기면 따라온다.
-  // 데스크톱의 두 손가락 제스처와 같은 모델이다.
   if (!(ctrls[0].userData.squeeze && ctrls[1].userData.squeeze)) { grab = null; return; }
   _p0.setFromMatrixPosition(ctrls[0].matrixWorld);
   _p1.setFromMatrixPosition(ctrls[1].matrixWorld);
   _mid.addVectors(_p0, _p1).multiplyScalar(.5);
   var dist = _p0.distanceTo(_p1);
   if (!grab) { grab = { mid: _mid.clone(), dist: dist, wp: world.position.clone(), ws: world.scale.x }; return; }
-  var s = grab.ws * (dist / Math.max(grab.dist, .04));
-  world.scale.setScalar(Math.max(.04, Math.min(1.5, s)));
+  world.scale.setScalar(Math.max(.04, Math.min(1.5, grab.ws * (dist / Math.max(grab.dist, .04)))));
   world.position.copy(grab.wp).add(_mid).sub(grab.mid);
 }
 function enterVR() {
   xrOn = true;
-  // 눈앞의 탁상 모형으로 만든다. 양손 그립으로 언제든 키우거나 옮길 수 있다.
   world.scale.setScalar(.22);
   world.position.set(0, .85, -.75);
-  world.rotation.set(0, 0, 0);
-  document.getElementById('bVR').textContent = 'VR 종료';
+  vrStart.visible = (phase === 'intro' && placed >= 3);
+  document.getElementById('bVR').textContent = t('exitVR');
 }
 function exitVR() {
   xrOn = false; grab = null;
-  world.scale.setScalar(1);
-  world.position.set(0, 0, 0);
-  document.getElementById('bVR').textContent = 'VR 시작';
+  world.scale.setScalar(1); world.position.set(0, 0, 0);
+  vrStart.visible = false;
+  document.getElementById('bVR').textContent = t('enter');
 }
 renderer.xr.addEventListener('sessionstart', enterVR);
 renderer.xr.addEventListener('sessionend', exitVR);
-
+function enterImmersive() {
+  if (xrSession) { xrSession.end(); return; }
+  navigator.xr.requestSession('immersive-vr', {
+    optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking']
+  }).then(function (s) {
+    xrSession = s;
+    s.addEventListener('end', function () { xrSession = null; });
+    renderer.xr.setReferenceSpaceType('local-floor');
+    return renderer.xr.setSession(s);
+  }).catch(function (err) {
+    say('vrfail', null, String(err && err.message || err));
+  });
+}
 (function setupVR() {
-  var btn = document.getElementById('bVR');
   if (!navigator.xr || !navigator.xr.isSessionSupported) return;
   navigator.xr.isSessionSupported('immersive-vr').then(function (ok) {
     if (!ok) return;
-    btn.style.display = '';
-    btn.onclick = function () {
-      if (xrSession) { xrSession.end(); return; }
-      navigator.xr.requestSession('immersive-vr', {
-        optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking']
-      }).then(function (s) {
-        xrSession = s;
-        s.addEventListener('end', function () { xrSession = null; });
-        renderer.xr.setReferenceSpaceType('local-floor');
-        return renderer.xr.setSession(s);
-      }).catch(function (err) {
-        say('VR 을 시작하지 못했다', String(err && err.message || err));
-      });
-    };
+    document.getElementById('bVR').style.display = '';
+    document.getElementById('bStartVR').style.display = '';
+    document.getElementById('bVR').onclick = enterImmersive;
+    document.getElementById('bStartVR').onclick = enterImmersive;
   }).catch(function () {});
 }());
 
 /* ─────────────────────────────────────── HUD */
-var elSay = document.getElementById('say');
-function say(t, s) {
-  elSay.querySelector('b').textContent = t;
-  elSay.querySelector('i').innerHTML = s || '';
+var elSay = document.getElementById('say'), curSay = null;
+function say(k, k2) {
+  curSay = { k: k, k2: k2, a: Array.prototype.slice.call(arguments, 2) };
+  renderSay();
+}
+function renderSay() {
+  if (!curSay) return;
+  elSay.querySelector('b').textContent = t.apply(null, [curSay.k].concat(curSay.a));
+  elSay.querySelector('i').innerHTML = curSay.k2 ? t.apply(null, [curSay.k2].concat(curSay.a)) : '';
 }
 var tagL = document.createElement('div'); tagL.className = 'tag'; document.body.appendChild(tagL);
 var tagR = document.createElement('div'); tagR.className = 'tag'; document.body.appendChild(tagR);
 var _proj = new THREE.Vector3();
-function placeTag(el, idx, html, cls, dy) {
+function placeTag(el, idx, main, sub, cls, dy) {
   if (xrOn || idx < 0 || idx >= P.length) { el.classList.remove('on'); return; }
   _proj.set(P[idx].x, P[idx].y + (dy || .6), P[idx].z).project(camera);
   el.style.left = ((_proj.x * .5 + .5) * innerWidth) + 'px';
   el.style.top = ((-_proj.y * .5 + .5) * innerHeight) + 'px';
   el.className = 'tag on ' + (cls || '');
-  el.innerHTML = html;
+  el.innerHTML = main + '<small>' + sub + '</small>';
+}
+var _tv = new THREE.Vector3();
+function placeTagAt(el, vec, dy, main, sub) {
+  if (xrOn) { el.classList.remove('on'); return; }
+  _tv.copy(vec); _tv.y += dy || 0;
+  world.updateMatrixWorld();
+  _tv.applyMatrix4(world.matrixWorld).project(camera);
+  el.style.left = ((_tv.x * .5 + .5) * innerWidth) + 'px';
+  el.style.top = ((-_tv.y * .5 + .5) * innerHeight) + 'px';
+  el.className = 'tag on';
+  el.innerHTML = main + '<small>' + sub + '</small>';
 }
 function setButtons() {
   var b = document.getElementById('bDemo');
   b.classList.toggle('on', mode === 'demo');
-  b.textContent = mode === 'demo' ? '돌아가기' : '왜 흔들리지?';
-  goalRing.visible = (mode === 'build');
+  b.textContent = mode === 'demo' ? t('back') : t('why');
   document.getElementById('hud').style.display = mode === 'build' ? '' : 'none';
+  document.getElementById('bMusic').textContent = bgm.paused ? t('music') : t('musicOff');
 }
+function applyLang() {
+  document.documentElement.lang = lang;
+  document.getElementById('bLang').textContent = lang === 'ko' ? 'EN' : '한국어';
+  document.getElementById('introSub').textContent = t('sub');
+  document.getElementById('bStart').textContent = t('start');
+  document.getElementById('bStartVR').textContent = t('startVR');
+  document.getElementById('bReset').textContent = t('reset');
+  document.getElementById('bSpeed').textContent = t('speed') + ' ' + (timeScale === 1 ? '1×' : '0.5×');
+  document.getElementById('bTheme').textContent = themeName === 'dark' ? t('theme_l') : t('theme_d');
+  document.getElementById('bVR').textContent = xrOn ? t('exitVR') : t('enter');
+  document.getElementById('zFit').textContent = t('fit');
+  document.getElementById('lHgt').textContent = t('hgt');
+  document.getElementById('lWob').textContent = t('wob');
+  document.getElementById('lUp').textContent = t('up');
+  document.getElementById('lDn').textContent = t('dn');
+  document.getElementById('lGc').textContent = t('gc');
+  if (phase === 'intro') {
+    document.getElementById('introStep').textContent =
+      placed < 3 ? t('i_place', 3 - placed) : t('i_done');
+  }
+  setButtons(); renderSay(); drawVRStart();
+}
+document.getElementById('bLang').onclick = function () {
+  lang = lang === 'ko' ? 'en' : 'ko'; applyLang();
+};
+document.getElementById('bStart').onclick = startGame;
 function resetView() { userZoom = 1; pan.x = pan.y = 0; orbit.yaw = .5; orbit.pitch = .2; }
 document.getElementById('bReset').onclick = function () {
   resetView(); if (mode === 'demo') setupDemo(); else setupBuild();
@@ -912,9 +1308,9 @@ document.getElementById('bReset').onclick = function () {
 document.getElementById('bDemo').onclick = function () {
   resetView(); if (mode === 'demo') setupBuild(); else setupDemo();
 };
-document.getElementById('bSpeed').onclick = function (e) {
+document.getElementById('bSpeed').onclick = function () {
   timeScale = timeScale < .8 ? 1 : .5;
-  e.target.textContent = '속도 ' + (timeScale === 1 ? '1×' : '0.5×');
+  document.getElementById('bSpeed').textContent = t('speed') + ' ' + (timeScale === 1 ? '1×' : '0.5×');
 };
 document.getElementById('bTheme').onclick = function () {
   applyTheme(themeName === 'dark' ? 'light' : 'dark');
@@ -923,7 +1319,7 @@ document.getElementById('zIn').onclick = function () { userZoom = Math.max(.35, 
 document.getElementById('zOut').onclick = function () { userZoom = Math.min(4, userZoom * 1.25); };
 document.getElementById('zFit').onclick = resetView;
 function resize() {
-  if (xrOn) return;                      // 몰입 중에는 컴포지터가 프레임버퍼를 소유한다
+  if (xrOn) return;
   renderer.setSize(innerWidth, innerHeight, false);
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
@@ -931,60 +1327,59 @@ function resize() {
 addEventListener('resize', resize); resize();
 
 /* ─────────────────────────────────────── 루프 */
+loadArchive(); buildArchMeshes();
 applyTheme(themeName);
-setupBuild();
+setupIntro();
+applyLang();
 var last = performance.now(), reanalyze = 0;
 
 renderer.setAnimationLoop(function (now) {
   now = now || performance.now();
   var raw = Math.min((now - last) / 1000, .033); last = now;
-  var t = now / 1000;
+  var tm = now / 1000;
   for (var k = 0; k < 2; k++) step(raw * timeScale / 2);
 
   if (mode === 'demo') {
     var lp = P[demo.left];
-    placeTag(tagL, demo.left, '막대 2개<small>삼각형 — 경첩</small>');
-    placeTag(tagR, demo.right, '막대 3개<small>사면체 — 강체</small>');
-    if (lp && lp.y < .5 && !demo.said) {
-      demo.said = true;
-      say('왼쪽이 무너졌다',
-          '막대 2개는 두 점을 잇는 축을 중심으로 <b>접힌다</b>. 오른쪽은 세 점에 이어져 접힐 방향이 아예 없다');
-    }
-  } else {
+    placeTag(tagL, demo.left, t('t_two'), t('t_two2'));
+    placeTag(tagR, demo.right, t('t_three'), t('t_three2'));
+    if (lp && lp.y < .5 && !demo.said) { demo.said = true; say('d_fell', 'd_fell2'); }
+  } else if (phase === 'play') {
     if (game.active >= 0) {
-      placeTag(tagL, game.active, '받쳐라<small>막대 ' + stickCount(game.active) + ' / 3</small>', 'call', .55);
+      placeTag(tagL, game.active, t('t_prop'), t('t_prop2', stickCount(game.active)), 'call', .55);
       tagR.classList.remove('on');
       var ap = P[game.active];
       if (isLocked(game.active)) {
-        game.active = -1;
-        analyze(); computeSpots();
+        game.active = -1; analyze(); computeSpots();
         if (maxY() >= GOAL_Y && flowState.up >= GOAL_UP && !game.won) {
           game.won = true;
-          say('완성 — 위아래가 통한다', '높이 <b>' + maxY().toFixed(1) +
-              '</b> · 상향 <b>' + flowState.up.toFixed(2) + '</b> · 막대 ' + S.length + '개');
-        } else if (!spots.length) {
-          say('막다른 길', '막대가 닿는 범위에 받칠 점이 없다. <b>바닥부터 넓혔어야 한다</b>');
-        } else if (maxY() >= GOAL_Y) {
-          say('높이는 닿았는데 정보가 안 올라온다',
-              '접점이 <b>' + flowState.groundContacts + '개</b> 뿐이다. 바닥 자리를 눌러 <b>넓혀라</b>');
-        } else {
-          say('잠겼다 — 흔들림이 멎었다', '이 점이 새 발판이 된다. 다음 자리를 골라라');
-        }
+          say('b_win', 'b_win2', maxY().toFixed(1), flowState.up.toFixed(2), S.length);
+          archiveCurrent();
+        } else if (!spots.length) say('b_dead', 'b_dead2');
+        else if (maxY() >= GOAL_Y) say('b_thin', 'b_thin2', flowState.groundContacts);
+        else say('b_lock', 'b_lock2');
       } else if (ap.y < .3) {
         var dead = game.active;
         S = S.filter(function (s) { return s.a !== dead && s.b !== dead; });
         P.splice(dead, 1);
         S.forEach(function (s) { if (s.a > dead) s.a--; if (s.b > dead) s.b--; });
         game.active = -1; analyze(); computeSpots();
-        say('무너졌다', '막대 3개가 붙기 전에 바닥에 닿았다. <b>다시 세워보라</b>');
+        say('b_drop', 'b_drop2');
       }
     } else { tagL.classList.remove('on'); tagR.classList.remove('on'); }
     goalRing.position.y = GOAL_Y;
     reanalyze += raw;
     if (reanalyze > .25) { reanalyze = 0; analyze(); }
-  }
+  } else { tagL.classList.remove('on'); tagR.classList.remove('on'); }
 
   syncParticles(raw * timeScale);
+  syncArchive(tm, raw);
+  if (mode === 'build' && phase === 'play' && archSel >= 0 && archSel < archMeshes.length) {
+    var ar = archMeshes[archSel].userData.rec;
+    placeTagAt(tagR, archMeshes[archSel].position, 1.15,
+      t('hgt') + ' ' + ar.h,
+      t('up') + ' ' + ar.up + ' · ' + t('gc') + ' ' + ar.gc + ' · ' + ar.n);
+  }
 
   var h = maxY(), w = avgWobble();
   document.getElementById('hgt').textContent = h.toFixed(2);
@@ -998,8 +1393,8 @@ renderer.setAnimationLoop(function (now) {
   document.getElementById('gc').textContent = flowState.groundContacts;
 
   if (xrOn) updateGrab();
-  else { autoFrame(); placeCamera(); }
-  syncMeshes(t);
+  else { autoFrame(); placeCamera(raw); }
+  syncMeshes(tm);
   renderer.render(scene, camera);
 });
 </script>
