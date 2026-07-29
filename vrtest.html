@@ -38,10 +38,11 @@
   #say > i{display:block;font-style:normal;font-size:11px;line-height:1.5;color:var(--dim);margin-top:4px}
   #say i b{color:var(--txt);font-weight:600}
 
-  #bottom{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);
-    display:flex;gap:6px;z-index:6;flex-wrap:wrap;justify-content:center;max-width:78vw;
+  /* 조작(왼쪽 아래)과 표시 설정(오른쪽 아래)을 갈라 둔다 — 섞어 놓으면 찾느라 헤맨다 */
+  #bottom,#bottomR{position:fixed;bottom:18px;display:flex;gap:6px;z-index:6;
     opacity:0;pointer-events:none;transition:opacity .4s}
-  #bottom.on{opacity:1;pointer-events:auto}
+  #bottom{left:18px} #bottomR{right:74px}
+  #bottom.on,#bottomR.on{opacity:1;pointer-events:auto}
   button{font:500 11px/1 inherit;letter-spacing:.04em;color:var(--dim);
     background:var(--panel);border:1px solid var(--line);
     padding:10px 15px;border-radius:3px;cursor:pointer;transition:.15s}
@@ -82,6 +83,8 @@
   #introIn h1{font:200 32px/1 inherit;letter-spacing:.3em;margin-left:.3em;color:var(--txt);white-space:nowrap}
   #introIn p{font-size:11px;letter-spacing:.16em;text-transform:uppercase;
     color:var(--dim);margin-top:12px}
+  #introBest{position:fixed;left:50%;bottom:5vh;transform:translateX(-50%);
+    font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);opacity:.6}
   #introStep{position:fixed;left:50%;bottom:13vh;transform:translateX(-50%);
     font-size:11.5px;letter-spacing:.05em;color:var(--dim);text-align:center;transition:opacity .3s}
   /* 삼각형이 닫히면 그 한가운데에서 START 가 떠오른다 */
@@ -110,6 +113,7 @@
   </div>
 </div>
 <div id="introStep">—</div>
+<div id="introBest">—</div>
 <div id="startWrap">
   <button id="bStart">—</button>
   <button id="bStartVR" style="display:none">—</button>
@@ -133,6 +137,7 @@
     <div class="bar"><i id="fDnBar"></i></div>
   </div>
   <div class="row"><span class="lbl" id="lGc">—</span><span class="val" id="gc">0</span></div>
+  <div class="row"><span class="lbl" id="lLk">—</span><span class="val" id="lk">0</span></div>
 </div>
 
 <div id="zoom">
@@ -145,6 +150,8 @@
   <button id="bReset">—</button>
   <button id="bDemo">—</button>
   <button id="bSpeed">—</button>
+</div>
+<div id="bottomR">
   <button id="bTheme">—</button>
   <button id="bMusic">—</button>
   <button id="bVR" style="display:none">—</button>
@@ -191,7 +198,10 @@ ko: {
   d_fell2:'막대 2개는 두 점을 잇는 축을 중심으로 <b>접힌다</b>. 오른쪽은 세 점에 이어져 접힐 방향이 아예 없다',
   t_two:'막대 2개', t_two2:'삼각형 — 경첩', t_three:'막대 3개', t_three2:'사면체 — 강체',
   t_prop:'받쳐라', t_prop2:'막대 {0} / 3',
-  vrfail:'몰입을 시작하지 못했다'
+  vrfail:'몰입을 시작하지 못했다', best:'Apple Vision Pro 에서 가장 좋습니다',
+  to2d:'2D 로 보기', links:'남은 연결', out:'연결을 다 썼다',
+  out2:'<b>다시</b> 를 눌러 새로 시작하라', nofl:'아직 위아래가 이어지지 않았다',
+  nofl2:'정점이 <b>고리</b> 높이에 닿으면 그때 흐름이 시작된다',
 },
 en: {
   sub:'Structure · Gravity · Flow', start:'START', startVR:'ENTER VR', enter:'Immersive',
@@ -218,7 +228,10 @@ en: {
   d_fell2:'Two struts <b>fold</b> about the axis between them. The right one reaches three points, so there is no way to fold',
   t_two:'2 struts', t_two2:'Triangle — hinge', t_three:'3 struts', t_three2:'Tetrahedron — rigid',
   t_prop:'Prop it', t_prop2:'{0} / 3 struts',
-  vrfail:'Could not start the immersive session'
+  vrfail:'Could not start the immersive session', best:'Best viewed on Apple Vision Pro',
+  to2d:'Back to 2D', links:'Links left', out:'Out of links',
+  out2:'Press <b>Restart</b> to begin again', nofl:'Not connected top to bottom yet',
+  nofl2:'Flow begins when the apex reaches the <b>ring</b>',
 }};
 var lang = (navigator.language || 'en').toLowerCase().indexOf('ko') === 0 ? 'ko' : 'en';
 function t(k) {
@@ -230,6 +243,7 @@ function t(k) {
 var GRAV = -4.4, DAMP = .992, ITER = 14, GROUND = 0;
 var REACH = 2.5, STILL = .00035, timeScale = .5;
 var GOAL_Y = 2.8, GOAL_UP = 1.0, BASE_R = 1.25;
+var LINK_MAX = 26, linksLeft = LINK_MAX;   // 연결 시도 예산. 다 쓰면 다시 시작해야 한다
 
 var P = [], S = [];
 var mode = 'build';                 // 'build' | 'demo'
@@ -305,7 +319,8 @@ var CHANNELS = [
   { id: 'up',   up: true,  hue: [.40, .52], rate: 0 },
   { id: 'down', up: false, hue: [.80, .95], rate: 0 }
 ];
-var flowState = { hop: [], carry: [], groundContacts: 0, apex: -1, up: 0, down: 0 };
+var flowState = { hop: [], carry: [], groundContacts: 0, apex: -1, up: 0, down: 0,
+                  pickUp: [], pickDn: [], meta: [], linked: false };
 
 function analyze() {
   var n = P.length, i, k;
@@ -341,13 +356,26 @@ function analyze() {
     }
   }
   var gc = gcList.length;
-  var carry = [];
-  for (i = 0; i < S.length; i++)
-    carry.push(isLocked(S[i].a) && isLocked(S[i].b) && seen[S[i].a] && seen[S[i].b]);
+  var carry = [], pickUp = [], pickDn = [], meta = [];
+  for (i = 0; i < S.length; i++) {
+    var ok = isLocked(S[i].a) && isLocked(S[i].b) && seen[S[i].a] && seen[S[i].b];
+    carry.push(ok);
+    var A = P[S[i].a], B = P[S[i].b];
+    var vert = Math.abs(A.y - B.y) / Math.max(S[i].len, .01);
+    var loHop = Math.min(hop[S[i].a] < 0 ? 99 : hop[S[i].a], hop[S[i].b] < 0 ? 99 : hop[S[i].b]);
+    meta.push({ vert: vert, hop: loHop });
+    if (!ok) continue;
+    // 하향은 안개다 — 수직에 가까운 막대를 타고 더 많이 흘러내린다
+    for (k = 0; k <= Math.round(vert * 3); k++) pickDn.push(i);
+    // 상향은 땅에서 쏘아 올린 pulse 다 — 아래쪽 막대에서 더 많이 출발한다
+    for (k = 0; k <= Math.round(3 / (1 + loHop)); k++) pickUp.push(i);
+  }
 
-  // 상향은 중력을 거스른다 — 높을수록 비싸고, 밑이 넓을수록 많이 올라간다.
+  // 첫 막대가 잠기자마자 반짝이면 안 된다 — 정점이 고리 높이에 닿아
+  // 위아래가 실제로 이어졌을 때 비로소 흐름이 산다.
   var apexH = apex >= 0 ? P[apex].y : 0;
-  var up = apex < 0 ? 0 : gc * .62 / (1 + apexH * .5);
+  var linked = apex >= 0 && apexH >= GOAL_Y - .15;
+  var up = linked ? gc * .62 / (1 + apexH * .5) : 0;
   var eq = 1;
   if (gcList.length > 1 && apex >= 0) {
     var mn = 1e9, mx = 0;
@@ -358,8 +386,9 @@ function analyze() {
     }
     eq = mx > 0 ? mn / mx : 1;
   }
-  var down = apex < 0 ? 0 : 1.35 * (.45 + .55 * eq);
-  flowState = { hop: hop, carry: carry, groundContacts: gc, apex: apex, up: up, down: down };
+  var down = linked ? 1.35 * (.45 + .55 * eq) : 0;
+  flowState = { hop: hop, carry: carry, groundContacts: gc, apex: apex, up: up, down: down,
+                pickUp: pickUp, pickDn: pickDn, meta: meta, linked: linked };
   CHANNELS[0].rate = up; CHANNELS[1].rate = down;
 }
 
@@ -485,11 +514,12 @@ function startGame() {
   phase = 'play';
   camTween = 1;                       // 위에서 내려다보던 시점을 비스듬히 돌린다
   document.getElementById('intro').classList.add('gone');
+  document.getElementById('introBest').style.opacity = '0';
   document.getElementById('introStep').style.opacity = '0';
   document.getElementById('startWrap').classList.remove('on');
   vrStart.visible = false;
   ['say', 'hud'].forEach(function (id) { document.getElementById(id).classList.add('on'); });
-  ['bottom', 'zoom'].forEach(function (id) { document.getElementById(id).classList.add('on'); });
+  ['bottom', 'bottomR', 'zoom'].forEach(function (id) { document.getElementById(id).classList.add('on'); });
   analyze(); computeSpots();
   say('b_pick', 'b_pick2');
   playMusic();
@@ -498,7 +528,7 @@ function startGame() {
 /* ─────────────────────────────────────── 게임 */
 var game = { active: -1, won: false };
 function setupBuild() {
-  mode = 'build'; archSel = -1; P = []; S = [];
+  mode = 'build'; archSel = -1; P = []; S = []; linksLeft = LINK_MAX;
   var idx = [];
   for (var k = 0; k < 3; k++) {
     var a = k / 3 * Math.PI * 2 - Math.PI / 2;
@@ -526,6 +556,7 @@ function supporters() {
 function support(from) {
   if (game.active < 0) return;
   if (!addStick(from, game.active)) return;
+  linksLeft--;
   if (stickCount(game.active) === 2) say('b_hinge', 'b_hinge2');
 }
 
@@ -572,7 +603,7 @@ var T = THEMES[themeName];
 
 /* ─────────────────────────────────────── 렌더 */
 var canvas = document.getElementById('c');
-var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
 renderer.xr.enabled = true;
 var scene = new THREE.Scene();
@@ -673,6 +704,7 @@ function paintParticles() {
     for (var i = 0; i < PPC; i++) {
       // 파티클마다 채널 색상대 안에서 색이 흩어진다 — "다양한 네온색"
       _hsl.setHSL(ch.hue[0] + ch.items[i].h * (ch.hue[1] - ch.hue[0]), 1, T.pLum);
+      ch.items[i].r = _hsl.r; ch.items[i].g = _hsl.g; ch.items[i].b = _hsl.b;
       col[i * 3] = _hsl.r; col[i * 3 + 1] = _hsl.g; col[i * 3 + 2] = _hsl.b;
     }
     ch.geo.attributes.color.needsUpdate = true;
@@ -692,7 +724,7 @@ function applyTheme(name) {
   hemi.color.setHex(T.hemi[0]); hemi.groundColor.setHex(T.hemi[1]); hemi.intensity = T.hemi[2];
   key.intensity = T.key; rim.intensity = T.rim;
   goalRing.material.color.setHex(T.goal); goalRing.material.opacity = T.goalOp;
-  buildGrid(); paintParticles(); drawVRStart();
+  buildGrid(); paintParticles(); drawVRStart(); redrawVRPanel();
   document.getElementById('bTheme').textContent = name === 'dark' ? t('theme_l') : t('theme_d');
 }
 
@@ -700,28 +732,52 @@ var UP = new THREE.Vector3(0, 1, 0);
 var _a = new THREE.Vector3(), _b = new THREE.Vector3(), _d = new THREE.Vector3();
 
 function syncParticles(dt) {
-  var carrying = [];
-  for (var i = 0; i < S.length; i++) if (flowState.carry[i]) carrying.push(i);
   CHANNELS.forEach(function (ch) {
     var pos = ch.geo.attributes.position.array;
-    var want = Math.min(PPC, Math.round(ch.rate * 140));
+    var col = ch.geo.attributes.color.array;
+    var pick = ch.up ? flowState.pickUp : flowState.pickDn;
+    var want = Math.min(PPC, Math.round(ch.rate * (ch.up ? 130 : 175)));
+    if (!pick || !pick.length) want = 0;
     for (var i = 0; i < PPC; i++) {
       var it = ch.items[i];
-      if (i >= want || !carrying.length) { pos[i * 3 + 1] = -999; it.s = -1; continue; }
+      if (i >= want) { pos[i * 3 + 1] = -999; it.s = -1; continue; }
       if (it.s < 0 || it.s >= S.length || !flowState.carry[it.s]) {
-        it.s = carrying[(Math.random() * carrying.length) | 0]; it.t = Math.random();
+        it.s = pick[(Math.random() * pick.length) | 0];
+        it.t = ch.up ? 0 : Math.random();
+        it.wear = 0;
       }
-      it.t += dt * 1.15;
-      if (it.t > 1) { it.t = 0; it.s = carrying[(Math.random() * carrying.length) | 0]; }
+      var md = flowState.meta[it.s] || { vert: .5, hop: 0 };
+      var spd;
+      if (ch.up) {
+        // 땅에서 쏘아 올린 pulse. 위로 갈수록 가속이 죽는다.
+        spd = 2.1 / (1 + md.hop * .55);
+      } else {
+        // 안개처럼 내려온다. 수직일수록 빨리, 옆으로 누울수록 느리게 번진다.
+        spd = .5 + md.vert * .95;
+      }
+      it.t += dt * spd;
+      if (it.t > 1) {
+        it.t = 0;
+        // 여러 다리를 돌아 올라갈수록 정보가 흩어진다 — 마찰이 쌓인다
+        it.wear = ch.up ? it.wear + .34 + md.vert * .12 : 0;
+        it.s = pick[(Math.random() * pick.length) | 0];
+        if (ch.up && it.wear > 1.6 && Math.random() < .55) { it.wear = 0; it.t = 0; }
+      }
       var st = S[it.s], A = P[st.a], B = P[st.b];
       var lo = flowState.hop[st.a] <= flowState.hop[st.b] ? A : B;
       var hi = (lo === A) ? B : A;
-      var f = ch.up ? lo : hi, g = ch.up ? hi : lo, u = it.t;
+      var f = ch.up ? lo : hi, g = ch.up ? hi : lo;
+      // 상향은 올라가며 감속하는 느낌, 하향은 늘어지며 내려앉는 느낌
+      var u = ch.up ? 1 - Math.pow(1 - it.t, 1.9) : Math.pow(it.t, 1.25);
       pos[i * 3] = f.x + (g.x - f.x) * u;
       pos[i * 3 + 1] = f.y + (g.y - f.y) * u;
       pos[i * 3 + 2] = f.z + (g.z - f.z) * u;
+      // 마찰로 흩어진 만큼 옅어진다
+      var fade = ch.up ? 1 / (1 + it.wear * .8) : 1;
+      col[i * 3] = it.r * fade; col[i * 3 + 1] = it.g * fade; col[i * 3 + 2] = it.b * fade;
     }
     ch.geo.attributes.position.needsUpdate = true;
+    ch.geo.attributes.color.needsUpdate = true;
   });
 }
 
@@ -1036,9 +1092,10 @@ function act() {
   var s = nearestSpotRay();
   if (s < 0) return;
   var g = spots[s];
+  if (linksLeft <= 0) { say('out', 'out2'); return; }
   if (g.ground) {
     var gi = addPoint(g.x, 0, g.z, true);
-    addStick(g.base[0], gi);
+    addStick(g.base[0], gi); linksLeft--;
     analyze(); computeSpots();
     say('b_wide', 'b_wide2', flowState.groundContacts);
     return;
@@ -1046,7 +1103,7 @@ function act() {
   var ni = addPoint(g.x, g.y, g.z, false);
   // 첫 막대를 어디에 거는지는 조준 방향이 정한다 — 쓰러지는 방향이 달라진다
   var anchor = nearestOfRay(g.base, 1e9);
-  addStick(anchor >= 0 ? anchor : g.base[0], ni);
+  addStick(anchor >= 0 ? anchor : g.base[0], ni); linksLeft--;
   game.active = ni; spots = [];
   say('b_fall', 'b_fall2');
 }
@@ -1146,9 +1203,14 @@ document.getElementById('bMusic').onclick = function () {
   playMusic(); setButtons();
 };
 
-/* ─────────────────────────────────────── VR */
-var xrOn = false, xrSession = null, grab = null;
-// 몰입 중에는 DOM 이 안 보이므로 시작 버튼을 3D 로 만든다
+/* ─────────────────────────────────────── 몰입 (visionOS 기준) */
+// visionOS 는 레이저를 쥐여 주지 않는다. 꼬집는 순간 그 시점의 시선에서
+// transient-pointer 입력이 만들어지고 놓으면 사라진다 — 즉 "보고 꼬집기" 가
+// 플랫폼이 주는 유일한 모델이다. 그래서 컨트롤러에 광선을 그리지 않는다.
+// 손을 보이게 하려면 패스스루가 필요하므로 immersive-ar 을 먼저 시도한다.
+var xrOn = false, xrSession = null, xrAR = false, grab = null;
+var savedBG = null;
+
 var vrCv = document.createElement('canvas'); vrCv.width = 512; vrCv.height = 256;
 var vrTex = new THREE.CanvasTexture(vrCv);
 var vrStart = new THREE.Mesh(new THREE.PlaneGeometry(.6, .3),
@@ -1164,75 +1226,151 @@ function drawVRStart() {
   g.fillText(t('start'), 256, 128);
   vrTex.needsUpdate = true;
 }
+
+// 몰입 중에는 DOM 이 안 보인다. 설정도 전부 3D 판으로 만들어 보고 꼬집게 한다.
+var vrPanel = new THREE.Group();
+vrPanel.position.set(-.62, 1.2, -.85);
+vrPanel.rotation.y = .5;
+vrPanel.visible = false; scene.add(vrPanel);
+var vrBtns = [];
+function makeVRBtn(label, action) {
+  var cv = document.createElement('canvas'); cv.width = 256; cv.height = 72;
+  var tex = new THREE.CanvasTexture(cv);
+  var m = new THREE.Mesh(new THREE.PlaneGeometry(.34, .096),
+    new THREE.MeshBasicMaterial({ map: tex, transparent: true }));
+  m.userData = { cv: cv, tex: tex, action: action, label: label };
+  vrPanel.add(m); vrBtns.push(m);
+  return m;
+}
+function drawVRBtn(m) {
+  var cv = m.userData.cv, g = cv.getContext('2d');
+  g.clearRect(0, 0, cv.width, cv.height);
+  g.fillStyle = T.panel; g.fillRect(0, 0, cv.width, cv.height);
+  g.strokeStyle = T.ink; g.lineWidth = 2; g.strokeRect(1, 1, cv.width - 2, cv.height - 2);
+  g.fillStyle = T.ink; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.font = '500 26px ui-sans-serif, system-ui, sans-serif';
+  g.fillText(m.userData.label(), cv.width / 2, cv.height / 2);
+  m.userData.tex.needsUpdate = true;
+}
+function buildVRPanel() {
+  var defs = [
+    [function () { return t('to2d'); }, function () { if (xrSession) xrSession.end(); }],
+    [function () { return t('reset'); }, function () { resetView(); setupBuild(); }],
+    [function () { return mode === 'demo' ? t('back') : t('why'); },
+     function () { resetView(); if (mode === 'demo') setupBuild(); else setupDemo(); }],
+    [function () { return themeName === 'dark' ? t('theme_l') : t('theme_d'); },
+     function () { applyTheme(themeName === 'dark' ? 'light' : 'dark'); }],
+    [function () { return bgm.paused ? t('music') : t('musicOff'); },
+     function () { document.getElementById('bMusic').onclick(); }]
+  ];
+  for (var i = 0; i < defs.length; i++) {
+    var m = makeVRBtn(defs[i][0], defs[i][1]);
+    m.position.y = (defs.length - 1 - i) * .115;
+  }
+}
+buildVRPanel();
+function redrawVRPanel() { for (var i = 0; i < vrBtns.length; i++) drawVRBtn(vrBtns[i]); }
+
+// 입력 소스. 광선은 그리지 않는다 — 꼬집는 순간의 시선 방향만 쓴다.
 var ctrls = [renderer.xr.getController(0), renderer.xr.getController(1)];
 ctrls.forEach(function (c) {
-  var g = new THREE.BufferGeometry().setFromPoints(
-    [new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, -1)]);
-  var line = new THREE.Line(g, new THREE.LineBasicMaterial({ transparent: true, opacity: .55 }));
-  line.scale.z = 4; c.add(line);
-  c.userData.squeeze = false;
+  c.userData.sel = false;
   scene.add(c);
   c.addEventListener('selectstart', function (e) {
+    e.target.userData.sel = true;
+    // 양손이 동시에 꼬집혀 있으면 그것은 조작이 아니라 "세계를 잡는" 동작이다
+    if (ctrls[0].userData.sel && ctrls[1].userData.sel) return;
     _rot.identity().extractRotation(e.target.matrixWorld);
     ray.ray.origin.setFromMatrixPosition(e.target.matrixWorld);
     ray.ray.direction.set(0, 0, -1).applyMatrix4(_rot).normalize();
-    // 3D 시작 버튼이 떠 있으면 그것부터 본다
     if (vrStart.visible && ray.intersectObject(vrStart, false).length) { startGame(); return; }
+    if (vrPanel.visible) {
+      var hit = ray.intersectObjects(vrBtns, false);
+      if (hit.length) { hit[0].object.userData.action(); redrawVRPanel(); return; }
+    }
     toWorldLocal();
     act();
   });
-  c.addEventListener('squeezestart', function (e) { e.target.userData.squeeze = true; });
-  c.addEventListener('squeezeend', function (e) { e.target.userData.squeeze = false; grab = null; });
+  c.addEventListener('selectend', function (e) { e.target.userData.sel = false; grab = null; });
+  c.addEventListener('squeezestart', function (e) { e.target.userData.sel = true; });
+  c.addEventListener('squeezeend', function (e) { e.target.userData.sel = false; grab = null; });
 });
 var _p0 = new THREE.Vector3(), _p1 = new THREE.Vector3(), _mid = new THREE.Vector3();
+var _q0 = new THREE.Quaternion(), _e0 = new THREE.Euler();
 function updateGrab() {
-  // 양손 그립 = 세계를 잡는다. 벌리면 커지고, 나란히 옮기면 따라온다.
-  if (!(ctrls[0].userData.squeeze && ctrls[1].userData.squeeze)) { grab = null; return; }
+  // 양손을 함께 꼬집으면 세계를 잡는다. 벌리면 커지고, 나란히 옮기면 따라오고,
+  // 두 손을 축으로 돌리면 같이 돈다. 컨트롤러의 그립도 같은 경로를 탄다.
+  if (!(ctrls[0].userData.sel && ctrls[1].userData.sel)) { grab = null; return; }
   _p0.setFromMatrixPosition(ctrls[0].matrixWorld);
   _p1.setFromMatrixPosition(ctrls[1].matrixWorld);
   _mid.addVectors(_p0, _p1).multiplyScalar(.5);
   var dist = _p0.distanceTo(_p1);
-  if (!grab) { grab = { mid: _mid.clone(), dist: dist, wp: world.position.clone(), ws: world.scale.x }; return; }
-  world.scale.setScalar(Math.max(.04, Math.min(1.5, grab.ws * (dist / Math.max(grab.dist, .04)))));
+  var ang = Math.atan2(_p1.x - _p0.x, _p1.z - _p0.z);
+  if (!grab) {
+    grab = { mid: _mid.clone(), dist: dist, ang: ang,
+             wp: world.position.clone(), ws: world.scale.x, wr: world.rotation.y };
+    return;
+  }
+  world.scale.setScalar(Math.max(.03, Math.min(2, grab.ws * (dist / Math.max(grab.dist, .04)))));
   world.position.copy(grab.wp).add(_mid).sub(grab.mid);
+  world.rotation.y = grab.wr - (ang - grab.ang);
 }
 function enterVR() {
   xrOn = true;
   world.scale.setScalar(.22);
   world.position.set(0, .85, -.75);
+  world.rotation.set(0, 0, 0);
+  if (xrAR) { savedBG = scene.background; scene.background = null; }   // 패스스루로 손이 보이게
   vrStart.visible = (phase === 'intro' && placed >= 3);
+  vrPanel.visible = true; redrawVRPanel();
   document.getElementById('bVR').textContent = t('exitVR');
 }
 function exitVR() {
   xrOn = false; grab = null;
-  world.scale.setScalar(1); world.position.set(0, 0, 0);
-  vrStart.visible = false;
+  world.scale.setScalar(1); world.position.set(0, 0, 0); world.rotation.set(0, 0, 0);
+  if (xrAR && savedBG !== null) scene.background = savedBG;
+  xrAR = false;
+  vrStart.visible = false; vrPanel.visible = false;
   document.getElementById('bVR').textContent = t('enter');
+  resize();
 }
 renderer.xr.addEventListener('sessionstart', enterVR);
 renderer.xr.addEventListener('sessionend', exitVR);
+
+function requestXR(kind) {
+  return navigator.xr.requestSession(kind, {
+    optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking', 'unbounded']
+  });
+}
 function enterImmersive() {
   if (xrSession) { xrSession.end(); return; }
-  navigator.xr.requestSession('immersive-vr', {
-    optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking']
-  }).then(function (s) {
-    xrSession = s;
-    s.addEventListener('end', function () { xrSession = null; });
-    renderer.xr.setReferenceSpaceType('local-floor');
-    return renderer.xr.setSession(s);
+  // 손이 보이려면 패스스루가 필요하다 — immersive-ar 을 먼저 시도한다.
+  navigator.xr.isSessionSupported('immersive-ar').then(function (arOK) {
+    var kind = arOK ? 'immersive-ar' : 'immersive-vr';
+    xrAR = arOK;
+    return requestXR(kind);
+  }).then(function (sess) {
+    xrSession = sess;
+    sess.addEventListener('end', function () { xrSession = null; });
+    try { renderer.xr.setReferenceSpaceType('local-floor'); } catch (e) {}
+    return renderer.xr.setSession(sess);
   }).catch(function (err) {
+    xrAR = false;
     say('vrfail', null, String(err && err.message || err));
   });
 }
 (function setupVR() {
   if (!navigator.xr || !navigator.xr.isSessionSupported) return;
-  navigator.xr.isSessionSupported('immersive-vr').then(function (ok) {
-    if (!ok) return;
+  Promise.all([
+    navigator.xr.isSessionSupported('immersive-ar').catch(function () { return false; }),
+    navigator.xr.isSessionSupported('immersive-vr').catch(function () { return false; })
+  ]).then(function (r) {
+    if (!r[0] && !r[1]) return;
     document.getElementById('bVR').style.display = '';
     document.getElementById('bStartVR').style.display = '';
     document.getElementById('bVR').onclick = enterImmersive;
     document.getElementById('bStartVR').onclick = enterImmersive;
-  }).catch(function () {});
+  });
 }());
 
 /* ─────────────────────────────────────── HUD */
@@ -1279,6 +1417,7 @@ function applyLang() {
   document.documentElement.lang = lang;
   document.getElementById('bLang').textContent = lang === 'ko' ? 'EN' : '한국어';
   document.getElementById('introSub').textContent = t('sub');
+  document.getElementById('introBest').textContent = t('best');
   document.getElementById('bStart').textContent = t('start');
   document.getElementById('bStartVR').textContent = t('startVR');
   document.getElementById('bReset').textContent = t('reset');
@@ -1291,11 +1430,12 @@ function applyLang() {
   document.getElementById('lUp').textContent = t('up');
   document.getElementById('lDn').textContent = t('dn');
   document.getElementById('lGc').textContent = t('gc');
+  document.getElementById('lLk').textContent = t('links');
   if (phase === 'intro') {
     document.getElementById('introStep').textContent =
       placed < 3 ? t('i_place', 3 - placed) : t('i_done');
   }
-  setButtons(); renderSay(); drawVRStart();
+  setButtons(); renderSay(); drawVRStart(); redrawVRPanel();
 }
 document.getElementById('bLang').onclick = function () {
   lang = lang === 'ko' ? 'en' : 'ko'; applyLang();
@@ -1335,7 +1475,10 @@ var last = performance.now(), reanalyze = 0;
 
 renderer.setAnimationLoop(function (now) {
   now = now || performance.now();
-  var raw = Math.min((now - last) / 1000, .033); last = now;
+  // XR 세션이 시작되면 이 콜백의 시간 기준이 performance.now() 와 달라져
+  // now < last 가 될 수 있다. 아래쪽을 안 막으면 dt 가 큰 음수가 되고
+  // GRAV*dt*dt 가 폭발해 구조가 한 프레임에 바닥으로 처박힌다.
+  var raw = Math.max(0, Math.min((now - last) / 1000, .033)); last = now;
   var tm = now / 1000;
   for (var k = 0; k < 2; k++) step(raw * timeScale / 2);
 
@@ -1357,6 +1500,8 @@ renderer.setAnimationLoop(function (now) {
           archiveCurrent();
         } else if (!spots.length) say('b_dead', 'b_dead2');
         else if (maxY() >= GOAL_Y) say('b_thin', 'b_thin2', flowState.groundContacts);
+        else if (linksLeft <= 0) say('out', 'out2');
+        else if (!flowState.linked && maxY() > 1.4) say('nofl', 'nofl2');
         else say('b_lock', 'b_lock2');
       } else if (ap.y < .3) {
         var dead = game.active;
@@ -1391,6 +1536,7 @@ renderer.setAnimationLoop(function (now) {
   document.getElementById('fDn').textContent = flowState.down.toFixed(2);
   document.getElementById('fDnBar').style.width = Math.min(100, flowState.down / 1.4 * 100) + '%';
   document.getElementById('gc').textContent = flowState.groundContacts;
+  document.getElementById('lk').textContent = Math.max(0, linksLeft);
 
   if (xrOn) updateGrab();
   else { autoFrame(); placeCamera(raw); }
