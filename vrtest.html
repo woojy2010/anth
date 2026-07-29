@@ -1,1607 +1,1007 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="ko" data-theme="dark">
 <head>
 <meta charset="utf-8">
-<title>HYPER-DIMENSIONAL ENERGY CORE — Spatial Web</title>
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="theme-color" content="#05060c">
-<meta name="description" content="A zero-asset, fully procedural volumetric energy core for visionOS Safari WebXR.">
+<title>CASCADE 프로토타입 — 막대·중력·흐름</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <style>
-/* ============================================================
-   visionOS Human Interface — Glass Material System
-   ============================================================ */
-:root{
-  --glass:        rgba(22, 26, 40, 0.42);
-  --glass-hi:     rgba(255,255,255,0.14);
-  --glass-line:   rgba(255,255,255,0.16);
-  --glass-line-2: rgba(255,255,255,0.07);
-  --ink:          rgba(255,255,255,0.96);
-  --ink-2:        rgba(255,255,255,0.62);
-  --ink-3:        rgba(255,255,255,0.38);
-  --accent:       #7dd3ff;
-  --accent-2:     #c08bff;
-  --accent-3:     #ff8fd0;
-  --tap:          52px;
-  --r-lg:         30px;
-  --r-md:         20px;
-  --r-sm:         14px;
-  --shadow: 0 26px 70px rgba(0,0,0,.62), 0 2px 0 rgba(255,255,255,.10) inset,
-            0 -1px 0 rgba(255,255,255,.05) inset;
-  --font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
-          "Helvetica Neue", "Pretendard", "Apple SD Gothic Neo", system-ui, sans-serif;
-}
+  /* ── 색 규칙 ───────────────────────────────────────────────────────────
+     구조는 죽은 물질이다 — 아주 옅게만 물든 무채색, 반투명.
+     흐르는 것만 색을 가진다 — 네온.
+     따라서 "색이 진하다 = 이 조직이 살아 있다" 가 화면에서 그대로 성립한다. */
+  :root[data-theme="dark"]{
+    --bg:#07080b; --panel:rgba(11,13,19,.74); --line:rgba(232,236,242,.10);
+    --txt:#e8ecf2; --dim:#79839a; --pure:#fff;
+    --neon-up:#4dffd5; --neon-dn:#ff4dcb;
+  }
+  :root[data-theme="light"]{
+    --bg:#eef1f6; --panel:rgba(255,255,255,.8); --line:rgba(20,26,38,.13);
+    --txt:#161d2b; --dim:#69738c; --pure:#0b1020;
+    --neon-up:#00a389; --neon-dn:#c4008f;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;background:var(--bg);color:var(--txt);overflow:hidden;
+    font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+    -webkit-user-select:none;user-select:none;transition:background .35s,color .35s}
+  /* canvas 는 대체 요소다. width/height 를 명시하지 않으면 inset:0 으로도 늘어나지
+     않고 드로잉 버퍼 크기(화면의 dpr 배)로 좌상단 기준 렌더된다 — Retina 에서
+     장면이 우측 하단으로 밀린다. */
+  canvas{display:block;position:fixed;inset:0;width:100%;height:100%;touch-action:none}
 
-*{ margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-html,body{ width:100%; height:100%; overflow:hidden; }
-body{
-  font-family:var(--font);
-  color:var(--ink);
-  background:
-    radial-gradient(1200px 900px at 50% 38%,  #14203c 0%,  #0a0d1c 46%, #04050b 100%),
-    radial-gradient(700px 700px at 12% 88%, rgba(120,60,190,.30), transparent 62%),
-    radial-gradient(700px 700px at 88% 12%, rgba(0,150,220,.26), transparent 62%),
-    #04050b;
-  -webkit-font-smoothing:antialiased;
-  text-rendering:optimizeLegibility;
-  overscroll-behavior:none;
-  touch-action:none;
-}
-canvas#scene{
-  position:fixed; inset:0; width:100%; height:100%; display:block;
-  touch-action:none; cursor:grab;
-}
-canvas#scene:active{ cursor:grabbing; }
+  .panel{background:var(--panel);border:1px solid var(--line);
+    backdrop-filter:blur(16px);border-radius:3px;transition:background .35s,border-color .35s}
 
-/* Film grain + vignette: sells the "optical glass" look.
-   No mix-blend-mode — blending over a WebGL surface forces a full-canvas
-   composite every frame in Safari, which is exactly what a stereo pass
-   cannot afford. Plain low-opacity dither gets 95% of the look for free. */
-#grain{
-  position:fixed; inset:-50%; pointer-events:none; z-index:2; opacity:.035;
-  background-image:
-    repeating-conic-gradient(#fff 0% 25%, #000 0% 50%);
-  background-size:3px 3px;
-  animation:grain 1.1s steps(4) infinite;
-}
-body.presenting #grain, body.presenting #vignette{ display:none; }
-@keyframes grain{
-  0%{transform:translate(0,0)} 25%{transform:translate(-2%,1%)}
-  50%{transform:translate(1%,-2%)} 75%{transform:translate(-1%,-1%)} 100%{transform:translate(0,0)}
-}
-#vignette{
-  position:fixed; inset:0; pointer-events:none; z-index:3;
-  background:radial-gradient(circle at 50% 45%, transparent 42%, rgba(0,0,0,.55) 100%);
-}
+  #say{position:fixed;left:50%;top:18px;transform:translateX(-50%);
+    padding:11px 20px;z-index:6;text-align:center;max-width:62vw}
+  #say > b{display:block;font:600 13px/1.35 inherit}
+  #say > i{display:block;font-style:normal;font-size:11px;line-height:1.5;color:var(--dim);margin-top:4px}
+  #say i b{color:var(--txt);font-weight:600}
 
-/* ---------- Overlay root (also used as WebXR dom-overlay) ---------- */
-#overlay{
-  position:fixed; inset:0; z-index:10; pointer-events:none;
-  display:flex; flex-direction:column; justify-content:space-between;
-  padding: max(20px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right))
-           max(20px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
-}
-#overlay.hidden{ opacity:0; transform:scale(.97); pointer-events:none; }
-#overlay{ transition:opacity .5s cubic-bezier(.22,1,.36,1), transform .5s cubic-bezier(.22,1,.36,1); }
+  #bottom{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);
+    display:flex;gap:6px;z-index:6;flex-wrap:wrap;justify-content:center;max-width:72vw}
+  button{font:500 11px/1 inherit;letter-spacing:.04em;color:var(--dim);
+    background:var(--panel);border:1px solid var(--line);
+    padding:10px 15px;border-radius:3px;cursor:pointer;transition:.15s}
+  button:hover{color:var(--txt);border-color:var(--dim)}
+  button.on{color:var(--pure);border-color:var(--pure)}
+  button:focus-visible{outline:1px solid var(--pure);outline-offset:2px}
 
-.glass{
-  background:var(--glass);
-  -webkit-backdrop-filter:blur(25px) saturate(190%);
-  backdrop-filter:blur(25px) saturate(190%);
-  border:1px solid var(--glass-line);
-  box-shadow:var(--shadow);
-  border-radius:var(--r-lg);
-  pointer-events:auto;
-}
+  #zoom{position:fixed;right:18px;bottom:18px;display:flex;flex-direction:column;gap:5px;z-index:6}
+  #zoom button{width:38px;height:38px;padding:0;font-size:15px;line-height:1}
 
-/* ---------- Top bar ---------- */
-.topbar{
-  display:flex; align-items:center; gap:14px; align-self:flex-start;
-  padding:13px 20px 13px 15px; border-radius:999px;
-  max-width:min(94vw, 640px);
-}
-.mark{
-  width:36px; height:36px; border-radius:12px; flex:0 0 36px;
-  background:conic-gradient(from 200deg, var(--accent), var(--accent-2), var(--accent-3), var(--accent));
-  box-shadow:0 0 22px rgba(125,211,255,.55), inset 0 0 12px rgba(0,0,0,.45);
-  animation:spin 9s linear infinite;
-}
-@keyframes spin{ to{ transform:rotate(360deg); } }
-.titles{ min-width:0; }
-.t1{ font-size:15px; font-weight:650; letter-spacing:.012em; white-space:nowrap;
-     overflow:hidden; text-overflow:ellipsis; }
-.t2{ font-size:11.5px; font-weight:500; color:var(--ink-3); letter-spacing:.10em;
-     text-transform:uppercase; margin-top:2px; white-space:nowrap; }
-.stat{
-  margin-left:auto; display:flex; gap:8px; align-items:center; flex:0 0 auto;
-  font-variant-numeric:tabular-nums; font-size:11.5px; color:var(--ink-2); letter-spacing:.05em;
-}
-.dot{ width:7px; height:7px; border-radius:50%; background:#4ade80; box-shadow:0 0 10px #4ade80; }
-.dot.warn{ background:#fbbf24; box-shadow:0 0 10px #fbbf24; }
-.dot.off{ background:#f87171; box-shadow:0 0 10px #f87171; }
+  #hud{position:fixed;right:18px;top:18px;padding:14px 15px;z-index:6;width:196px}
+  .row{display:flex;justify-content:space-between;gap:10px;align-items:baseline;margin:0 0 3px}
+  .lbl{font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--dim)}
+  .val{font:500 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--txt)}
+  .bar{height:2px;background:var(--line);overflow:hidden;margin-bottom:13px}
+  .bar i{display:block;height:100%;width:0;background:var(--dim);transition:width .2s}
+  .sep{height:1px;background:var(--line);margin:2px 0 13px}
+  .up .lbl{color:var(--neon-up)} .up i{background:var(--neon-up)}
+  .dn .lbl{color:var(--neon-dn)} .dn i{background:var(--neon-dn)}
 
-/* ---------- Bottom cluster ---------- */
-.bottom{ display:flex; flex-direction:column; gap:16px; align-items:center; width:100%; }
-
-.controls{
-  width:min(100%, 660px); padding:22px 24px 20px;
-  display:flex; flex-direction:column; gap:6px;
-}
-.ctrl-head{
-  display:flex; justify-content:space-between; align-items:baseline;
-  margin-bottom:8px; padding:0 2px;
-}
-.ctrl-head h2{ font-size:12px; font-weight:640; letter-spacing:.14em; color:var(--ink-2); text-transform:uppercase; }
-.ctrl-head span{ font-size:11px; color:var(--ink-3); letter-spacing:.06em; }
-
-.row{ padding:7px 2px; }
-.row-label{ display:flex; justify-content:space-between; align-items:center; margin-bottom:2px; }
-.row-label b{ font-size:14.5px; font-weight:560; letter-spacing:.005em; }
-.row-label i{
-  font-style:normal; font-size:13px; font-variant-numeric:tabular-nums;
-  color:var(--accent); font-weight:600; letter-spacing:.02em;
-  min-width:74px; text-align:right;
-}
-
-/* 52px tap target: the input is tall & transparent, the visible track is thin */
-input[type=range]{
-  -webkit-appearance:none; appearance:none;
-  width:100%; height:var(--tap); background:transparent; outline:none; display:block; margin:0;
-}
-input[type=range]::-webkit-slider-runnable-track{
-  height:10px; border-radius:999px;
-  background:linear-gradient(90deg, var(--accent) 0%, var(--accent-2) var(--fill,50%),
-             rgba(255,255,255,.11) var(--fill,50%), rgba(255,255,255,.11) 100%);
-  box-shadow:inset 0 1px 2px rgba(0,0,0,.5), 0 0 18px -4px var(--accent);
-}
-input[type=range]::-webkit-slider-thumb{
-  -webkit-appearance:none; appearance:none;
-  width:30px; height:30px; margin-top:-10px; border-radius:50%;
-  background:radial-gradient(circle at 34% 30%, #ffffff, #d5e6f5 46%, #9fb6cc 100%);
-  border:1px solid rgba(255,255,255,.9);
-  box-shadow:0 5px 16px rgba(0,0,0,.62), 0 0 22px rgba(125,211,255,.6);
-  transition:transform .16s cubic-bezier(.22,1,.36,1);
-}
-input[type=range]:active::-webkit-slider-thumb{ transform:scale(1.22); }
-input[type=range]::-moz-range-track{ height:10px; border-radius:999px; background:rgba(255,255,255,.11); }
-input[type=range]::-moz-range-progress{ height:10px; border-radius:999px; background:var(--accent); }
-input[type=range]::-moz-range-thumb{
-  width:28px; height:28px; border-radius:50%; border:1px solid #fff; background:#eaf4ff;
-  box-shadow:0 5px 16px rgba(0,0,0,.6);
-}
-
-/* ---------- Action row ---------- */
-.actions{ display:flex; gap:12px; align-items:center; justify-content:center; flex-wrap:wrap; }
-
-button{ font-family:var(--font); border:none; cursor:pointer; color:var(--ink); }
-
-#enter{
-  position:relative; overflow:hidden;
-  min-height:var(--tap); padding:0 34px; border-radius:999px;
-  font-size:16px; font-weight:640; letter-spacing:.10em;
-  background:linear-gradient(180deg, rgba(255,255,255,.20), rgba(255,255,255,.05));
-  -webkit-backdrop-filter:blur(25px) saturate(190%); backdrop-filter:blur(25px) saturate(190%);
-  border:1px solid rgba(255,255,255,.28);
-  box-shadow:0 18px 46px rgba(0,0,0,.55), 0 0 34px -6px rgba(125,211,255,.55),
-             inset 0 1px 0 rgba(255,255,255,.34);
-  transition:transform .2s cubic-bezier(.22,1,.36,1), box-shadow .2s, opacity .2s;
-  pointer-events:auto;
-}
-#enter::after{
-  content:""; position:absolute; inset:0;
-  background:linear-gradient(100deg, transparent 30%, rgba(255,255,255,.42) 50%, transparent 70%);
-  transform:translateX(-120%); animation:sheen 3.6s cubic-bezier(.4,0,.2,1) infinite;
-}
-@keyframes sheen{ 0%,58%{transform:translateX(-120%)} 100%{transform:translateX(120%)} }
-#enter:hover{ transform:translateY(-2px) scale(1.02); }
-#enter:active{ transform:translateY(0) scale(.98); }
-#enter[disabled]{ opacity:.45; cursor:not-allowed; box-shadow:none; }
-#enter[disabled]::after{ display:none; }
-
-.pill{
-  min-height:var(--tap); min-width:var(--tap); padding:0 22px; border-radius:999px;
-  font-size:13px; font-weight:600; letter-spacing:.09em;
-  background:var(--glass); border:1px solid var(--glass-line);
-  -webkit-backdrop-filter:blur(25px) saturate(190%); backdrop-filter:blur(25px) saturate(190%);
-  box-shadow:0 12px 30px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.14);
-  transition:transform .18s cubic-bezier(.22,1,.36,1), background .18s;
-  pointer-events:auto;
-}
-.pill:hover{ background:rgba(60,72,100,.5); transform:translateY(-1px); }
-.pill:active{ transform:scale(.95); }
-.pill[data-on="1"]{ color:#04121c; background:linear-gradient(180deg,#bfe9ff,#7dd3ff);
-  border-color:rgba(255,255,255,.6); box-shadow:0 0 30px -4px var(--accent); }
-
-.hint{ font-size:11.5px; color:var(--ink-3); letter-spacing:.07em; text-align:center; }
-
-/* ---------- Boot curtain ---------- */
-#boot{
-  position:fixed; inset:0; z-index:40; display:grid; place-items:center;
-  background:radial-gradient(circle at 50% 46%, #0d1428, #04050b 72%);
-  transition:opacity .9s cubic-bezier(.22,1,.36,1); text-align:center; padding:24px;
-}
-#boot.gone{ opacity:0; pointer-events:none; }
-.bt{ font-size:12px; letter-spacing:.34em; color:var(--ink-2); text-transform:uppercase; }
-.bar{ width:min(74vw,320px); height:2px; margin:20px auto 0; border-radius:2px; background:rgba(255,255,255,.10); overflow:hidden; }
-.bar i{ display:block; height:100%; width:32%; border-radius:2px;
-  background:linear-gradient(90deg,var(--accent),var(--accent-2),var(--accent-3));
-  animation:load 1.35s cubic-bezier(.6,.05,.3,1) infinite; }
-@keyframes load{ 0%{transform:translateX(-110%)} 100%{transform:translateX(360%)} }
-
-/* ---------- Immersive-session curtain ---------- */
-#inxr{
-  position:fixed; inset:0; z-index:20; display:none; place-items:center; text-align:center;
-  padding:28px; background:rgba(4,5,11,.55);
-  -webkit-backdrop-filter:blur(18px); backdrop-filter:blur(18px);
-}
-#inxr.on{ display:grid; }
-#inxr p{ font-size:14px; color:var(--ink-2); letter-spacing:.08em; line-height:1.9; }
-
-@media (max-width: 560px){
-  .t2{ display:none; }
-  .controls{ padding:16px 16px 12px; border-radius:var(--r-md); }
-  #enter{ padding:0 24px; font-size:14.5px; letter-spacing:.07em; }
-}
-@media (prefers-reduced-motion: reduce){
-  .mark, #enter::after, .bar i, #grain{ animation:none !important; }
-}
+  .tag{position:fixed;transform:translate(-50%,-50%);z-index:5;pointer-events:none;
+    font:600 10.5px/1.35 inherit;text-align:center;white-space:nowrap;
+    padding:5px 10px;border-radius:3px;background:var(--panel);
+    border:1px solid var(--line);opacity:0;transition:opacity .18s;color:var(--txt)}
+  .tag.on{opacity:1}
+  .tag small{display:block;font-size:9px;font-weight:400;color:var(--dim);margin-top:2px}
+  .tag.call{border-color:var(--pure)}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
 <body>
+<canvas id="c"></canvas>
+<div id="say" class="panel"><b>—</b><i>—</i></div>
 
-<canvas id="scene"></canvas>
-<div id="grain"></div>
-<div id="vignette"></div>
-
-<div id="overlay">
-  <div class="topbar glass">
-    <div class="mark"></div>
-    <div class="titles">
-      <div class="t1">Hyper-Dimensional Energy Core</div>
-      <div class="t2">Procedural · Zero-Asset · WebXR</div>
-    </div>
-    <div class="stat"><span class="dot" id="dot"></span><span id="statTxt">INIT</span></div>
+<div id="hud" class="panel">
+  <div class="row"><span class="lbl">높이</span><span class="val" id="hgt">0.00</span></div>
+  <div class="bar"><i id="hgtBar"></i></div>
+  <div class="row"><span class="lbl">흔들림</span><span class="val" id="wob">0.0000</span></div>
+  <div class="bar"><i id="wobBar"></i></div>
+  <div class="sep"></div>
+  <div class="up">
+    <div class="row"><span class="lbl">현장 → 정점</span><span class="val" id="fUp">0.00</span></div>
+    <div class="bar"><i id="fUpBar"></i></div>
   </div>
-
-  <div class="bottom">
-    <div class="controls glass">
-      <div class="ctrl-head">
-        <h2>Core Parameters</h2>
-        <span id="modeTxt">WINDOWED 3D</span>
-      </div>
-
-      <div class="row">
-        <div class="row-label"><b>Core Pulse Speed</b><i id="vPulse">1.00×</i></div>
-        <input id="sPulse" type="range" min="0" max="300" value="100">
-      </div>
-
-      <div class="row">
-        <div class="row-label"><b>Particle Density / Scale</b><i id="vDensity">12 000</i></div>
-        <input id="sDensity" type="range" min="0" max="100" value="70">
-      </div>
-
-      <div class="row">
-        <div class="row-label"><b>Color Spectrum Shift</b><i id="vSpectrum">208°</i></div>
-        <input id="sSpectrum" type="range" min="0" max="360" value="208">
-      </div>
-    </div>
-
-    <div class="actions">
-      <button id="enter" disabled>ENTER SPATIAL REALITY</button>
-      <button class="pill" id="ignite">IGNITE</button>
-      <button class="pill" id="audio" data-on="0">AUDIO</button>
-    </div>
-    <div class="hint" id="hint">드래그 = 회전 · 휠/핀치 = 줌 · 더블탭 = 폭발</div>
+  <div class="dn">
+    <div class="row"><span class="lbl">정점 → 현장</span><span class="val" id="fDn">0.00</span></div>
+    <div class="bar"><i id="fDnBar"></i></div>
   </div>
+  <div class="row"><span class="lbl">땅에 닿은 접점</span><span class="val" id="gc">0</span></div>
 </div>
 
-<div id="inxr">
-  <p>
-    SPATIAL SESSION ACTIVE<br>
-    <span style="color:rgba(255,255,255,.4)">헤드셋에서 코어를 확인하세요 · 핀치로 패널 조작</span>
-  </p>
+<div id="zoom">
+  <button id="zIn" aria-label="확대">+</button>
+  <button id="zOut" aria-label="축소">−</button>
+  <button id="zFit" style="font-size:9px">맞춤</button>
 </div>
 
-<div id="boot">
-  <div>
-    <div class="bt">Compiling Procedural Volumetrics</div>
-    <div class="bar"><i></i></div>
-  </div>
+<div id="bottom">
+  <button id="bReset">다시</button>
+  <button id="bDemo">왜 흔들리지?</button>
+  <button id="bSpeed">속도 0.5×</button>
+  <button id="bTheme">라이트</button>
+  <button id="bVR" style="display:none">VR 시작</button>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="./three.min.js"></script>
 <script>
-/* ============================================================================
-   HYPER-DIMENSIONAL ENERGY CORE
-   Single-file spatial web application — visionOS Safari / WebXR
-   ----------------------------------------------------------------------------
-   Architecture notes:
-   · Zero external assets. Every mesh, gradient, sprite and UI texture is
-     generated at runtime from math or a 2D canvas.
-   · three.js r128 is loaded as a *global* script, so the ESM `VRButton.js`
-     module cannot be used (it imports three.module.js and would double-load the
-     library). The XR entry point is therefore hand-rolled below.
-   · visionOS Safari commonly exposes `immersive-vr` and refuses `immersive-ar`.
-     `negotiateXR()` probes both and adapts the button + scene composition.
-   · `logarithmicDepthBuffer` is enabled for stereoscopic depth precision, which
-     REQUIRES every custom ShaderMaterial to include the logdepth chunks —
-     omitting them silently destroys depth sorting in the headset.
-   ========================================================================== */
-(function () {
 'use strict';
+/* ───────────────────────────────────────────────────────────────────────────
+   물리는 Verlet + 거리 제약(PBD). 이 해석기는 삼각형도 사면체도 모르고 거리만
+   맞춘다. 그런데도 삼각형은 접히고 사면체는 안 접힌다 — 3D 에서 그게 사실이라서.
+   "사면체는 강체다" 라는 규칙을 코드로 쓰지 않았는데 게임에 존재한다.
 
-if (typeof THREE === 'undefined') {
-  document.getElementById('boot').innerHTML =
-    '<div class="bt" style="color:#f87171">THREE.JS CDN UNREACHABLE</div>';
-  return;
+   흐름은 채널 배열이다. 하향을 자금·운영·유통 3개로 늘릴 때 CHANNELS 에 항목만
+   추가하면 된다 — 계산도 렌더도 배열을 순회할 뿐이라 구조를 고치지 않는다.
+
+   VR: 모든 오브젝트는 world 그룹 안에 있다. 몰입 세션에서는 이 그룹을 축소해
+   눈앞의 탁상 모형으로 만들고, 양손 그립으로 그룹째 옮기고 키운다.
+   ─────────────────────────────────────────────────────────────────────── */
+
+var GRAV = -4.4, DAMP = .992, ITER = 14, GROUND = 0;
+var REACH = 2.5;                  // 막대 최대 길이. 얇게 올라가면 이것 때문에 막힌다
+var STILL = .00035;
+var timeScale = .5;
+var GOAL_Y = 2.8, GOAL_UP = 1.0;  // 클리어는 높이 + 상향 도달량. 둘 다 있어야 한다
+
+var P = [], S = [];
+var mode = 'build';
+
+/* ─────────────────────────────────────────────────── 물리 */
+function addPoint(x, y, z, pin) {
+  var j = pin ? 0 : .006;         // 완벽한 수직은 불안정 평형이라 안 쓰러진다
+  P.push({ x: x, y: y, z: z, px: x + (Math.random() - .5) * j, py: y,
+           pz: z + (Math.random() - .5) * j, pin: !!pin, still: 0, locked: false, born: y });
+  return P.length - 1;
 }
-
-/* ------------------------------------------------------------------ config */
-const MAX_PARTICLES = 16000;
-const MIN_PARTICLES = 1200;
-const SHARD_COUNT   = 26;
-
-const state = {
-  pulse:    1.0,     // 0 .. 3
-  density:  0.70,    // 0 .. 1
-  spectrum: 208/360, // hue 0 .. 1
-  burst:    0.0,
-  inXR:     false,
-  xrMode:   null,
-  floorRef: true,
-  quality:  1.0
-};
-
-const clock = new THREE.Clock();
-const DPR   = () => Math.min(window.devicePixelRatio || 1, 2);
-
-// The glass control panel owns the lower-centre third of the viewport, so the
-// core is lifted in world space to sit in the clear area above it.
-const WORLD_Y = 0.62;
-
-/* ------------------------------------------------------------- GLSL common */
-// Compact gradient noise + fbm + HSV. Shared by every procedural material.
-const GLSL_LIB = `
-vec3 hash3(vec3 p){
-  p = vec3(dot(p,vec3(127.1,311.7,74.7)),
-           dot(p,vec3(269.5,183.3,246.1)),
-           dot(p,vec3(113.5,271.9,124.6)));
-  return -1.0 + 2.0*fract(sin(p)*43758.5453123);
+function d3(p, q) {
+  var dx = p.x - q.x, dy = p.y - q.y, dz = p.z - q.z;
+  return Math.sqrt(dx * dx + dy * dy + dz * dz);
 }
-float gnoise(vec3 p){
-  vec3 i = floor(p), f = fract(p);
-  vec3 u = f*f*(3.0-2.0*f);
-  return mix(mix(mix(dot(hash3(i+vec3(0,0,0)), f-vec3(0,0,0)),
-                     dot(hash3(i+vec3(1,0,0)), f-vec3(1,0,0)), u.x),
-                 mix(dot(hash3(i+vec3(0,1,0)), f-vec3(0,1,0)),
-                     dot(hash3(i+vec3(1,1,0)), f-vec3(1,1,0)), u.x), u.y),
-             mix(mix(dot(hash3(i+vec3(0,0,1)), f-vec3(0,0,1)),
-                     dot(hash3(i+vec3(1,0,1)), f-vec3(1,0,1)), u.x),
-                 mix(dot(hash3(i+vec3(0,1,1)), f-vec3(0,1,1)),
-                     dot(hash3(i+vec3(1,1,1)), f-vec3(1,1,1)), u.x), u.y), u.z);
+function addStick(a, b) {
+  if (a === b || a < 0 || b < 0) return false;
+  for (var i = 0; i < S.length; i++)
+    if ((S[i].a === a && S[i].b === b) || (S[i].a === b && S[i].b === a)) return false;
+  S.push({ a: a, b: b, len: d3(P[a], P[b]) });
+  return true;
 }
-float fbm(vec3 p){
-  float a = 0.5, s = 0.0;
-  for (int i = 0; i < 4; i++){ s += a*gnoise(p); p *= 2.03; a *= 0.5; }
-  return s;
-}
-vec3 hsv2rgb(vec3 c){
-  vec4 K = vec4(1.0, 2.0/3.0, 1.0/3.0, 3.0);
-  vec3 p = abs(fract(c.xxx + K.xyz)*6.0 - K.www);
-  return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
-}
-`;
-
-/* ---------------------------------------------------------------- renderer */
-const canvas = document.getElementById('scene');
-const renderer = new THREE.WebGLRenderer({
-  canvas: canvas,
-  alpha: true,                     // passthrough composites through the canvas
-  antialias: true,
-  powerPreference: 'high-performance',
-  logarithmicDepthBuffer: true,    // stereoscopic depth precision
-  stencil: false,
-  preserveDrawingBuffer: false
-});
-renderer.setPixelRatio(DPR());
-renderer.setSize(window.innerWidth, window.innerHeight, false);
-renderer.setClearColor(0x000000, 0);
-renderer.outputEncoding      = THREE.sRGBEncoding;
-renderer.toneMapping         = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 0.95;
-renderer.shadowMap.enabled   = true;
-renderer.shadowMap.type      = THREE.PCFSoftShadowMap;
-renderer.xr.enabled          = true;
-renderer.xr.setFramebufferScaleFactor(1.1);   // Vision Pro is already dense
-
-/* ------------------------------------------------------------------- scene */
-const scene  = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(50, window.innerWidth/window.innerHeight, 0.05, 400);
-camera.position.set(0, 0.42, 6.0);
-camera.lookAt(0, 0, 0);
-
-// world  -> repositioned/rescaled when entering a spatial session
-// system -> the core assembly itself (spin + parallax live here)
-const world  = new THREE.Group();
-const system = new THREE.Group();
-world.position.y = WORLD_Y;
-world.add(system);
-scene.add(world);
-
-/* ------------------------------------------------------------- environment */
-// Procedural equirectangular sky -> PMREM. This is what makes the metal shards
-// read as polished chrome instead of flat cardboard; MeshStandardMaterial has
-// nothing to reflect without it. Still zero external assets: it is a canvas.
-function makeEnvironment() {
-  const c = document.createElement('canvas');
-  c.width = 512; c.height = 256;
-  const x = c.getContext('2d');
-  const g = x.createLinearGradient(0, 0, 0, 256);
-  g.addColorStop(0.00, '#0a1330');
-  g.addColorStop(0.38, '#33578c');
-  g.addColorStop(0.50, '#e6f1ff');   // horizon band = the specular highlight
-  g.addColorStop(0.62, '#1d2a4d');
-  g.addColorStop(1.00, '#04050b');
-  x.fillStyle = g; x.fillRect(0, 0, 512, 256);
-  // Cool sources only — a warm one reflects off metalness:1.0 as a muddy tan.
-  [[110, 84, 78, 'rgba(190,235,255,0.98)'],
-   [332, 58, 56, 'rgba(200,180,255,0.92)'],
-   [436, 168, 64, 'rgba(150,205,255,0.70)']].forEach(function (s) {
-    const rg = x.createRadialGradient(s[0], s[1], 0, s[0], s[1], s[2]);
-    rg.addColorStop(0, s[3]); rg.addColorStop(1, 'rgba(0,0,0,0)');
-    x.fillStyle = rg;
-    x.beginPath(); x.arc(s[0], s[1], s[2], 0, Math.PI*2); x.fill();
-  });
-  const tex = new THREE.CanvasTexture(c);
-  tex.mapping  = THREE.EquirectangularReflectionMapping;
-  tex.encoding = THREE.sRGBEncoding;
-  const pmrem = new THREE.PMREMGenerator(renderer);
-  pmrem.compileEquirectangularShader();
-  const env = pmrem.fromEquirectangular(tex).texture;
-  pmrem.dispose(); tex.dispose();
-  return env;
-}
-scene.environment = makeEnvironment();
-
-/* ------------------------------------------------------------------ lights */
-scene.add(new THREE.AmbientLight(0x2a3a66, 0.55));
-
-const coreLight = new THREE.PointLight(0x7dd3ff, 3.4, 22, 2.0);
-system.add(coreLight);
-
-const rimLight = new THREE.DirectionalLight(0xc08bff, 2.1);
-rimLight.position.set(-4.2, 3.4, -3.0);
-// Parent the shadow target to `system` so the shadow frustum follows the core
-// when `world` is re-anchored into the room during a spatial session.
-rimLight.target.position.set(0, 0, 0);
-rimLight.castShadow = true;
-rimLight.shadow.mapSize.set(1024, 1024);
-rimLight.shadow.camera.near =  0.5;
-rimLight.shadow.camera.far  = 18;
-rimLight.shadow.camera.left = rimLight.shadow.camera.bottom = -4;
-rimLight.shadow.camera.right = rimLight.shadow.camera.top   =  4;
-rimLight.shadow.bias = -0.0016;
-rimLight.shadow.radius = 3;
-system.add(rimLight);
-system.add(rimLight.target);
-
-const keyLight = new THREE.DirectionalLight(0xff8fd0, 1.15);
-keyLight.position.set(4.0, -2.4, 3.2);
-system.add(keyLight);
-
-const orbitLight = new THREE.PointLight(0xff8fd0, 2.0, 14, 2.0);
-system.add(orbitLight);
-
-/* =========================================================================
-   1. PLASMA CORE — displaced icosahedron driven by fbm
-   ========================================================================= */
-const coreUniforms = {
-  uTime:     { value: 0 },
-  uPulse:    { value: state.pulse },
-  uSpectrum: { value: state.spectrum },
-  uBurst:    { value: 0 }
-};
-
-const plasma = new THREE.Mesh(
-  // detail 16 -> ~5.8k tris: dense enough for smooth fbm displacement,
-  // cheap enough to survive a stereo pass at Vision Pro resolution.
-  new THREE.IcosahedronGeometry(0.72, 16),
-  new THREE.ShaderMaterial({
-    uniforms: coreUniforms,
-    transparent: true,
-    depthWrite: true,
-    vertexShader: `
-      uniform float uTime, uPulse, uBurst;
-      varying vec3  vN, vP, vLocal;
-      varying float vTurb;
-      #include <common>
-      #include <logdepthbuf_pars_vertex>
-      ${GLSL_LIB}
-      void main(){
-        float t = uTime * uPulse;
-        vec3 p  = position;
-        float n = fbm(normalize(p) * 2.35 + vec3(0.0, t*0.42, t*0.22));
-        float breathe = 0.055 * sin(t*1.35) + 0.028 * sin(t*3.1 + n*5.0);
-        float d = n*0.15 + breathe + uBurst*0.30;
-        p += normal * d;
-        vTurb  = n;
-        vLocal = p;
-        vN = normalize(normalMatrix * normal);
-        vec4 mv = modelViewMatrix * vec4(p, 1.0);
-        vP = mv.xyz;
-        gl_Position = projectionMatrix * mv;
-        #include <logdepthbuf_vertex>
-      }`,
-    fragmentShader: `
-      uniform float uTime, uPulse, uSpectrum, uBurst;
-      varying vec3  vN, vP, vLocal;
-      varying float vTurb;
-      #include <common>
-      #include <logdepthbuf_pars_fragment>
-      ${GLSL_LIB}
-      void main(){
-        #include <logdepthbuf_fragment>
-        float t = uTime * uPulse;
-        vec3  V = normalize(-vP);
-        float fres = pow(1.0 - clamp(dot(normalize(vN), V), 0.0, 1.0), 2.2);
-
-        // Layered energy veins crawling across the surface
-        float veins = fbm(vLocal*4.6 + vec3(t*0.55, -t*0.3, t*0.4));
-        veins = pow(abs(veins), 0.42);
-        float bands = 0.5 + 0.5*sin(vLocal.y*13.0 - t*2.2 + vTurb*7.0);
-
-        float hue  = uSpectrum + vTurb*0.16 + veins*0.10 + length(vLocal)*0.05;
-        // The hot tone keeps real saturation — desaturating it toward white is
-        // what turns the plasma into a featureless bulb once the veins peak.
-        vec3  base = hsv2rgb(vec3(fract(hue), 0.86 - veins*0.22, 1.0));
-        vec3  hot  = hsv2rgb(vec3(fract(hue + 0.13), 0.58, 1.0));
-
-        // Kept deliberately under ~1.4 average: ACES clips to flat white above
-        // that, and the core is read through the additive halo + particle field.
-        vec3 col = mix(base*0.44, hot*1.00, veins*0.82);
-        col += base * fres * 1.55;
-        col += hot  * pow(bands, 6.0) * 0.38;
-        col *= 0.82 + 0.30*sin(t*1.8);
-        col += vec3(1.0, 0.86, 0.72) * uBurst * 2.2;
-
-        gl_FragColor = vec4(col, 1.0);
-        #include <tonemapping_fragment>
-        #include <encodings_fragment>
-      }`
-  })
-);
-system.add(plasma);
-
-/* =========================================================================
-   2. GEOMETRIC CAGE — icosahedron edge lattice
-   ========================================================================= */
-const cageUniforms = {
-  uTime:     { value: 0 },
-  uPulse:    { value: state.pulse },
-  uSpectrum: { value: state.spectrum },
-  uBurst:    { value: 0 }
-};
-const cageMat = new THREE.ShaderMaterial({
-  uniforms: cageUniforms,
-  transparent: true,
-  blending: THREE.AdditiveBlending,
-  depthWrite: false,
-  vertexShader: `
-    uniform float uTime, uPulse, uBurst;
-    varying float vE, vD;
-    #include <common>
-    #include <logdepthbuf_pars_vertex>
-    void main(){
-      float t = uTime * uPulse;
-      vec3 p = position * (1.0 + 0.035*sin(t*1.6 + position.y*2.4) + uBurst*0.22);
-      vE = length(position);
-      vec4 mv = modelViewMatrix * vec4(p, 1.0);
-      vD = -mv.z;
-      gl_Position = projectionMatrix * mv;
-      #include <logdepthbuf_vertex>
-    }`,
-  fragmentShader: `
-    uniform float uTime, uPulse, uSpectrum, uBurst;
-    varying float vE, vD;
-    #include <common>
-    #include <logdepthbuf_pars_fragment>
-    ${GLSL_LIB}
-    void main(){
-      #include <logdepthbuf_fragment>
-      float t = uTime * uPulse;
-      float scan = 0.55 + 0.45*sin(vE*9.0 - t*3.4);
-      vec3 c = hsv2rgb(vec3(fract(uSpectrum + 0.06 + vE*0.05), 0.55, 1.0));
-      float a = (0.30 + 0.55*scan + uBurst*0.8) * clamp(9.0/vD, 0.2, 1.6);
-      gl_FragColor = vec4(c * (1.0 + scan*0.9 + uBurst*2.0), a);
-      #include <tonemapping_fragment>
-      #include <encodings_fragment>
-    }`
-});
-
-const cages = [];
-[[0.98, 1], [1.34, 0]].forEach(function (cfg, i) {
-  const cage = new THREE.LineSegments(
-    new THREE.EdgesGeometry(new THREE.IcosahedronGeometry(cfg[0], cfg[1]), 1),
-    cageMat
-  );
-  cage.userData.spin = i === 0 ? 0.16 : -0.09;
-  cage.userData.tilt = i === 0 ? 0.22 : -0.34;
-  system.add(cage);
-  cages.push(cage);
-});
-
-/* =========================================================================
-   3. GLASS SHELL + VOLUMETRIC HALO — fresnel only, no transmission pass
-   ========================================================================= */
-const shellUniforms = {
-  uTime:     { value: 0 },
-  uPulse:    { value: state.pulse },
-  uSpectrum: { value: state.spectrum },
-  uBurst:    { value: 0 }
-};
-
-const shell = new THREE.Mesh(
-  new THREE.SphereGeometry(1.62, 72, 48),
-  new THREE.ShaderMaterial({
-    uniforms: shellUniforms,
-    transparent: true,
-    depthWrite: false,
-    side: THREE.DoubleSide,
-    vertexShader: `
-      uniform float uTime, uPulse, uBurst;
-      varying vec3 vN, vP, vL;
-      #include <common>
-      #include <logdepthbuf_pars_vertex>
-      ${GLSL_LIB}
-      void main(){
-        float t = uTime * uPulse;
-        vec3 p = position * (1.0 + 0.02*fbm(normalize(position)*3.0 + t*0.35) + uBurst*0.14);
-        vL = p;
-        vN = normalize(normalMatrix * normal);
-        vec4 mv = modelViewMatrix * vec4(p, 1.0);
-        vP = mv.xyz;
-        gl_Position = projectionMatrix * mv;
-        #include <logdepthbuf_vertex>
-      }`,
-    fragmentShader: `
-      uniform float uTime, uPulse, uSpectrum, uBurst;
-      varying vec3 vN, vP, vL;
-      #include <common>
-      #include <logdepthbuf_pars_fragment>
-      ${GLSL_LIB}
-      void main(){
-        #include <logdepthbuf_fragment>
-        float t = uTime * uPulse;
-        vec3  V = normalize(-vP);
-        vec3  N = normalize(vN);
-        float f = pow(1.0 - abs(dot(N, V)), 3.1);
-
-        // Thin-film iridescence: hue sweeps with the fresnel term
-        vec3 tint = hsv2rgb(vec3(fract(uSpectrum + f*0.34 + 0.02*sin(t*0.7)), 0.62, 1.0));
-        // Caustic filaments creeping over the glass
-        float caust = pow(abs(fbm(vL*3.2 + vec3(0.0, t*0.5, t*0.3))), 3.0) * 3.2;
-
-        // Tight fresnel so only the rim reads as glass — a broad falloff turns
-        // the shell into an opaque grey ball and hides the core inside it.
-        float a = f*0.34 + caust*0.10 + uBurst*0.30;
-        vec3 col = tint*(f*1.15 + 0.06) + vec3(1.0)*caust*0.22 + tint*uBurst*1.4;
-        gl_FragColor = vec4(col, clamp(a, 0.0, 0.55));
-        #include <tonemapping_fragment>
-        #include <encodings_fragment>
-      }`
-  })
-);
-shell.renderOrder = 4;
-system.add(shell);
-
-const halo = new THREE.Mesh(
-  new THREE.SphereGeometry(2.55, 48, 32),
-  new THREE.ShaderMaterial({
-    uniforms: shellUniforms,
-    transparent: true,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
-    side: THREE.BackSide,
-    vertexShader: `
-      varying vec3 vN, vP;
-      #include <common>
-      #include <logdepthbuf_pars_vertex>
-      void main(){
-        vN = normalize(normalMatrix * normal);
-        vec4 mv = modelViewMatrix * vec4(position, 1.0);
-        vP = mv.xyz;
-        gl_Position = projectionMatrix * mv;
-        #include <logdepthbuf_vertex>
-      }`,
-    fragmentShader: `
-      uniform float uTime, uPulse, uSpectrum, uBurst;
-      varying vec3 vN, vP;
-      #include <common>
-      #include <logdepthbuf_pars_fragment>
-      ${GLSL_LIB}
-      void main(){
-        #include <logdepthbuf_fragment>
-        float t = uTime * uPulse;
-        float f = pow(1.0 - abs(dot(normalize(vN), normalize(-vP))), 3.4);
-        vec3 c = hsv2rgb(vec3(fract(uSpectrum + 0.03), 0.70, 1.0));
-        float a = f * (0.11 + 0.045*sin(t*1.4)) + uBurst*0.35;
-        gl_FragColor = vec4(c*(0.85 + uBurst*2.0), a);
-        #include <tonemapping_fragment>
-        #include <encodings_fragment>
-      }`
-  })
-);
-halo.renderOrder = 2;
-system.add(halo);
-
-/* =========================================================================
-   4. ACCRETION DISC + GYRO RINGS
-   ========================================================================= */
-const discUniforms = {
-  uTime:     { value: 0 },
-  uPulse:    { value: state.pulse },
-  uSpectrum: { value: state.spectrum },
-  uBurst:    { value: 0 }
-};
-const disc = new THREE.Mesh(
-  new THREE.RingGeometry(1.85, 3.55, 220, 1),
-  new THREE.ShaderMaterial({
-    uniforms: discUniforms,
-    transparent: true,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
-    side: THREE.DoubleSide,
-    vertexShader: `
-      varying vec2 vUv; varying vec3 vL;
-      #include <common>
-      #include <logdepthbuf_pars_vertex>
-      void main(){
-        vUv = uv; vL = position;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        #include <logdepthbuf_vertex>
-      }`,
-    fragmentShader: `
-      uniform float uTime, uPulse, uSpectrum, uBurst;
-      varying vec2 vUv; varying vec3 vL;
-      #include <common>
-      #include <logdepthbuf_pars_fragment>
-      ${GLSL_LIB}
-      void main(){
-        #include <logdepthbuf_fragment>
-        float t = uTime * uPulse;
-        float r  = length(vL.xy);
-        float an = atan(vL.y, vL.x);
-        // Differential rotation: inner bands sweep faster than outer ones
-        float sw = an*3.0 + t*(2.4 - r*0.42);
-        float streak = pow(abs(0.5 + 0.5*sin(sw*4.0)), 3.4);
-        float dust   = pow(abs(fbm(vec3(cos(an)*r, sin(an)*r, t*0.25)*2.4)), 2.0);
-        float radial = smoothstep(1.85, 2.35, r) * (1.0 - smoothstep(2.6, 3.35, r));
-        vec3 c = hsv2rgb(vec3(fract(uSpectrum + 0.12 + r*0.06), 0.66, 1.0));
-        // Alpha is small on purpose. Seen edge-on, every disc fragment along the
-        // view ray stacks additively; anything brighter blows out to a white bar
-        // across the whole frame.
-        float a = radial * (streak*0.085 + dust*0.075) * (0.85 + uBurst*1.6);
-        gl_FragColor = vec4(c*(0.9 + streak*0.6 + uBurst*2.0), a);
-        #include <tonemapping_fragment>
-        #include <encodings_fragment>
-      }`
-  })
-);
-disc.rotation.x = -Math.PI/2;
-disc.renderOrder = 1;
-system.add(disc);
-
-const rings = [];
-[[1.95, 0.9, 0.35, 0.34], [2.25, -0.6, 1.15, -0.22], [2.62, 1.4, -0.55, 0.16]]
-.forEach(function (cfg) {
-  const ring = new THREE.Mesh(
-    new THREE.TorusGeometry(cfg[0], 0.0125, 10, 260),
-    cageMat
-  );
-  ring.rotation.set(cfg[1], cfg[2], 0);
-  ring.userData.spin = cfg[3];
-  system.add(ring);
-  rings.push(ring);
-});
-
-/* =========================================================================
-   5. ORBITING SHARDS — the only PBR meshes; they carry the real shadows
-   ========================================================================= */
-const shards = [];
-const shardGeo = new THREE.OctahedronGeometry(0.085, 0);
-for (let i = 0; i < SHARD_COUNT; i++) {
-  const mat = new THREE.MeshStandardMaterial({
-    color: 0xe8f1fc, metalness: 1.0, roughness: 0.19,
-    envMapIntensity: 1.5,
-    emissive: 0x0a2740, emissiveIntensity: 1.0
-  });
-  const m = new THREE.Mesh(shardGeo, mat);
-  m.castShadow = true;
-  m.receiveShadow = true;
-  m.userData = {
-    r:   1.9 + Math.random()*1.5,
-    a:   Math.random()*Math.PI*2,
-    y:   (Math.random()-0.5)*1.7,
-    sp:  (0.12 + Math.random()*0.30) * (Math.random() < 0.5 ? -1 : 1),
-    sc:  0.55 + Math.random()*1.15,
-    rx:  Math.random()*2, ry: Math.random()*2
-  };
-  m.scale.setScalar(m.userData.sc);
-  system.add(m);
-  shards.push(m);
-}
-
-// Contact shadow catcher — windowed mode only; hidden in passthrough
-const floorDisc = new THREE.Mesh(
-  new THREE.CircleGeometry(5.2, 72),
-  new THREE.ShadowMaterial({ opacity: 0.42 })
-);
-floorDisc.rotation.x = -Math.PI/2;
-floorDisc.position.y = -2.85;
-floorDisc.receiveShadow = true;
-system.add(floorDisc);
-
-/* =========================================================================
-   6. PARTICLE FIELD — 16 000 depth-aware points, GPU-animated
-   ========================================================================= */
-const pGeo   = new THREE.BufferGeometry();
-const pPos   = new Float32Array(MAX_PARTICLES*3);
-const pSeed  = new Float32Array(MAX_PARTICLES);
-const pSize  = new Float32Array(MAX_PARTICLES);
-const pSpeed = new Float32Array(MAX_PARTICLES);
-const pKind  = new Float32Array(MAX_PARTICLES);
-
-for (let i = 0; i < MAX_PARTICLES; i++) {
-  const ring = Math.random() < 0.68;
-  let x, y, z, r;
-  if (ring) {
-    const a = Math.random()*Math.PI*2;
-    r = 1.95 + Math.pow(Math.random(), 0.55)*1.75;
-    const thick = 0.30 * (1.0 - (r-1.95)/1.75*0.55);
-    x = Math.cos(a)*r;
-    z = Math.sin(a)*r;
-    y = (Math.random()-0.5)*thick + Math.sin(a*3.0)*0.07;
-  } else {
-    const u = Math.random(), v = Math.random();
-    const th = Math.acos(2*u - 1), ph = 2*Math.PI*v;
-    r = 1.25 + Math.pow(Math.random(), 2.1)*2.9;
-    x = r*Math.sin(th)*Math.cos(ph);
-    y = r*Math.cos(th)*0.80;
-    z = r*Math.sin(th)*Math.sin(ph);
-  }
-  pPos[i*3] = x; pPos[i*3+1] = y; pPos[i*3+2] = z;
-  pSeed[i]  = Math.random();
-  pSize[i]  = (ring ? 1.5 : 1.1) * (0.45 + Math.pow(Math.random(), 2.4)*2.3);
-  pSpeed[i] = (ring ? 0.42 : 0.13) * (0.55 + Math.random()*0.9) / (0.55 + r*0.22);
-  pKind[i]  = ring ? 0.0 : 1.0;
-}
-
-pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
-pGeo.setAttribute('aSeed',    new THREE.BufferAttribute(pSeed, 1));
-pGeo.setAttribute('aSize',    new THREE.BufferAttribute(pSize, 1));
-pGeo.setAttribute('aSpeed',   new THREE.BufferAttribute(pSpeed, 1));
-pGeo.setAttribute('aKind',    new THREE.BufferAttribute(pKind, 1));
-pGeo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 8);
-
-const pUniforms = {
-  uTime:     { value: 0 },
-  uPulse:    { value: state.pulse },
-  uSpectrum: { value: state.spectrum },
-  uScale:    { value: 1.0 },
-  uBurst:    { value: 0 },
-  uPR:       { value: DPR() }
-};
-
-const particles = new THREE.Points(pGeo, new THREE.ShaderMaterial({
-  uniforms: pUniforms,
-  transparent: true,
-  depthWrite: false,
-  blending: THREE.AdditiveBlending,
-  vertexShader: `
-    uniform float uTime, uPulse, uSpectrum, uScale, uBurst, uPR;
-    attribute float aSeed, aSize, aSpeed, aKind;
-    varying vec3  vCol;
-    varying float vAlpha;
-    #include <common>
-    #include <logdepthbuf_pars_vertex>
-    ${GLSL_LIB}
-    void main(){
-      float t = uTime * uPulse;
-      vec3  p = position;
-
-      // Differential orbital rotation about Y
-      float ang = t * aSpeed;
-      float ca = cos(ang), sa = sin(ang);
-      p.xz = mat2(ca, -sa, sa, ca) * p.xz;
-
-      // Turbulent drift + radial breathing
-      float n = fbm(p*0.55 + vec3(0.0, t*0.30, t*0.18));
-      p += vec3(n, fbm(p*0.5 + 11.3 + t*0.2), -n) * (0.16 + aKind*0.30);
-      p *= 1.0 + 0.045*sin(t*1.6 + aSeed*6.2831);
-
-      // Shockwave
-      p *= 1.0 + uBurst * (0.55 + aSeed*1.15);
-
-      vec4 mv = modelViewMatrix * vec4(p, 1.0);
-      float dist = max(0.05, -mv.z);
-
-      float hue = uSpectrum + length(p)*0.055 + aSeed*0.13 + aKind*0.09 + n*0.05;
-      float sat = mix(0.86, 0.34, pow(aSeed, 2.5));
-      vCol = hsv2rgb(vec3(fract(hue), sat, 1.0));
-      vCol += vec3(1.0, 0.85, 0.7) * uBurst * 1.4;
-
-      float twinkle = 0.62 + 0.38*sin(t*3.4 + aSeed*31.4);
-      vAlpha = twinkle * mix(0.80, 0.34, aKind) * clamp(20.0/(dist*dist), 0.04, 1.0);
-      vAlpha = clamp(vAlpha, 0.0, 1.0);
-
-      gl_Position  = projectionMatrix * mv;
-      // Depth-aware size attenuation, DPR-corrected. The constant is tuned so a
-      // point at the core's own distance lands around 6-14 CSS px: large enough
-      // to hold colour, small enough that 16k of them stay distinct instead of
-      // merging into one white cloud.
-      gl_PointSize = clamp(aSize * uScale * uPR * (26.0/dist) * (1.0 + uBurst*0.8), 1.0, 30.0);
-      #include <logdepthbuf_vertex>
-    }`,
-  fragmentShader: `
-    varying vec3  vCol;
-    varying float vAlpha;
-    #include <common>
-    #include <logdepthbuf_pars_fragment>
-    void main(){
-      #include <logdepthbuf_fragment>
-      vec2 uv = gl_PointCoord - 0.5;
-      float d = dot(uv, uv);
-      if (d > 0.25) discard;
-      float g = 1.0 - d*4.0;
-      float core = pow(g, 9.0);
-      float glow = pow(g, 2.6);
-      gl_FragColor = vec4(vCol * (glow*0.55 + core*1.6), (glow*0.20 + core*0.55) * vAlpha);
-      #include <tonemapping_fragment>
-      #include <encodings_fragment>
-    }`
-}));
-particles.frustumCulled = false;
-system.add(particles);
-
-function applyDensity() {
-  const n = Math.round(MIN_PARTICLES + (MAX_PARTICLES - MIN_PARTICLES) * state.density);
-  pGeo.setDrawRange(0, Math.round(n * state.quality));
-  pUniforms.uScale.value = 0.72 + state.density * 0.75;
+function stickCount(i) {
+  var n = 0;
+  for (var k = 0; k < S.length; k++) if (S[k].a === i || S[k].b === i) n++;
   return n;
 }
-
-/* =========================================================================
-   7. DEEP-FIELD STARS — windowed mode only
-   ========================================================================= */
-const starGeo = new THREE.BufferGeometry();
-const sPos = new Float32Array(2600*3), sSeed = new Float32Array(2600), sSz = new Float32Array(2600);
-for (let i = 0; i < 2600; i++) {
-  const u = Math.random(), v = Math.random();
-  const th = Math.acos(2*u-1), ph = 2*Math.PI*v, r = 30 + Math.random()*70;
-  sPos[i*3]   = r*Math.sin(th)*Math.cos(ph);
-  sPos[i*3+1] = r*Math.cos(th);
-  sPos[i*3+2] = r*Math.sin(th)*Math.sin(ph);
-  sSeed[i] = Math.random();
-  sSz[i]   = 0.5 + Math.pow(Math.random(), 3.0)*3.4;
+function speed(p) { return Math.abs(p.x - p.px) + Math.abs(p.y - p.py) + Math.abs(p.z - p.pz); }
+function isLocked(i) { return P[i].pin || P[i].locked; }
+// "잠김"은 규칙이 아니라 물리에게 묻는다. 임계값 하나면 미세한 떨림에 깜빡이므로 이력을 준다.
+function updateLock(i, dt) {
+  var p = P[i];
+  if (p.pin) return;
+  var v = speed(p);
+  if (p.locked) { if (v > STILL * 8) { p.locked = false; p.still = 0; } }
+  else { p.still = v < STILL ? p.still + dt : 0; if (p.still > .12) p.locked = true; }
 }
-starGeo.setAttribute('position', new THREE.BufferAttribute(sPos, 3));
-starGeo.setAttribute('aSeed',    new THREE.BufferAttribute(sSeed, 1));
-starGeo.setAttribute('aSize',    new THREE.BufferAttribute(sSz, 1));
-
-const stars = new THREE.Points(starGeo, new THREE.ShaderMaterial({
-  uniforms: { uTime: { value: 0 }, uPR: { value: DPR() }, uSpectrum: pUniforms.uSpectrum },
-  transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-  vertexShader: `
-    uniform float uTime, uPR, uSpectrum;
-    attribute float aSeed, aSize;
-    varying vec3 vCol; varying float vA;
-    #include <common>
-    #include <logdepthbuf_pars_vertex>
-    ${GLSL_LIB}
-    void main(){
-      vec4 mv = modelViewMatrix * vec4(position, 1.0);
-      vCol = hsv2rgb(vec3(fract(uSpectrum + 0.5 + aSeed*0.2), 0.20 + aSeed*0.25, 1.0));
-      vA = 0.35 + 0.65*pow(abs(sin(uTime*0.7 + aSeed*40.0)), 3.0);
-      gl_Position = projectionMatrix * mv;
-      gl_PointSize = clamp(aSize * uPR * (60.0/max(1.0,-mv.z)) * 6.0, 1.0, 12.0);
-      #include <logdepthbuf_vertex>
-    }`,
-  fragmentShader: `
-    varying vec3 vCol; varying float vA;
-    #include <common>
-    #include <logdepthbuf_pars_fragment>
-    void main(){
-      #include <logdepthbuf_fragment>
-      vec2 uv = gl_PointCoord - 0.5;
-      float d = dot(uv,uv);
-      if (d > 0.25) discard;
-      float g = pow(1.0 - d*4.0, 3.0);
-      gl_FragColor = vec4(vCol*g*1.8, g*vA);
-      #include <tonemapping_fragment>
-      #include <encodings_fragment>
-    }`
-}));
-stars.frustumCulled = false;
-scene.add(stars);
-
-/* =========================================================================
-   8. SPATIAL CONTROL PANEL — canvas-textured plane, pinch-ray driven
-      (visionOS does not expose dom-overlay, so the UI must live in 3D)
-   ========================================================================= */
-const PW = 1024, PH = 560;
-const pCanvas = document.createElement('canvas');
-pCanvas.width = PW; pCanvas.height = PH;
-const pctx = pCanvas.getContext('2d');
-const panelTex = new THREE.CanvasTexture(pCanvas);
-panelTex.encoding = THREE.sRGBEncoding;
-panelTex.anisotropy = 4;
-
-const panel = new THREE.Mesh(
-  new THREE.PlaneGeometry(0.72, 0.72*PH/PW),
-  new THREE.MeshBasicMaterial({ map: panelTex, transparent: true, depthWrite: false, side: THREE.DoubleSide })
-);
-panel.position.set(0, -0.62, 0.55);
-panel.renderOrder = 20;
-panel.visible = false;
-world.add(panel);
-
-const PANEL_ROWS = [
-  { key: 'pulse',    label: 'CORE PULSE SPEED',        y: 190, fmt: v => (v*3).toFixed(2) + '×' },
-  { key: 'density',  label: 'PARTICLE DENSITY / SCALE', y: 320, fmt: v => Math.round(MIN_PARTICLES + (MAX_PARTICLES-MIN_PARTICLES)*v).toLocaleString() },
-  { key: 'spectrum', label: 'COLOR SPECTRUM SHIFT',     y: 450, fmt: v => Math.round(v*360) + '°' }
-];
-const TRACK_X0 = 70, TRACK_X1 = PW - 70;
-
-function roundRect(c, x, y, w, h, r) {
-  c.beginPath();
-  c.moveTo(x+r, y); c.arcTo(x+w, y, x+w, y+h, r); c.arcTo(x+w, y+h, x, y+h, r);
-  c.arcTo(x, y+h, x, y, r); c.arcTo(x, y, x+w, y, r); c.closePath();
-}
-
-function drawPanel() {
-  pctx.clearRect(0, 0, PW, PH);
-
-  // Frosted slab
-  const g = pctx.createLinearGradient(0, 0, 0, PH);
-  g.addColorStop(0, 'rgba(30,36,56,0.80)');
-  g.addColorStop(1, 'rgba(12,15,26,0.86)');
-  pctx.fillStyle = g;
-  roundRect(pctx, 6, 6, PW-12, PH-12, 44); pctx.fill();
-  pctx.strokeStyle = 'rgba(255,255,255,0.20)'; pctx.lineWidth = 3;
-  roundRect(pctx, 6, 6, PW-12, PH-12, 44); pctx.stroke();
-
-  // Header
-  pctx.fillStyle = 'rgba(255,255,255,0.95)';
-  pctx.font = '600 34px -apple-system, "SF Pro Display", system-ui, sans-serif';
-  pctx.textBaseline = 'alphabetic';
-  pctx.fillText('CORE PARAMETERS', TRACK_X0, 84);
-  pctx.fillStyle = 'rgba(255,255,255,0.36)';
-  pctx.font = '500 22px -apple-system, system-ui, sans-serif';
-  pctx.fillText('PINCH · DRAG', TRACK_X1 - pctx.measureText('PINCH · DRAG').width, 82);
-  pctx.fillStyle = 'rgba(255,255,255,0.12)';
-  pctx.fillRect(TRACK_X0, 108, TRACK_X1-TRACK_X0, 2);
-
-  PANEL_ROWS.forEach(function (row) {
-    const v = state[row.key] / (row.key === 'pulse' ? 3 : 1);
-    const fx = TRACK_X0 + (TRACK_X1-TRACK_X0)*v;
-
-    pctx.fillStyle = 'rgba(255,255,255,0.92)';
-    pctx.font = '560 27px -apple-system, system-ui, sans-serif';
-    pctx.fillText(row.label, TRACK_X0, row.y - 26);
-
-    const val = row.fmt(v);
-    pctx.fillStyle = '#7dd3ff';
-    pctx.font = '600 27px -apple-system, system-ui, sans-serif';
-    pctx.fillText(val, TRACK_X1 - pctx.measureText(val).width, row.y - 26);
-
-    pctx.fillStyle = 'rgba(255,255,255,0.13)';
-    roundRect(pctx, TRACK_X0, row.y-7, TRACK_X1-TRACK_X0, 14, 7); pctx.fill();
-
-    const lg = pctx.createLinearGradient(TRACK_X0, 0, TRACK_X1, 0);
-    lg.addColorStop(0, '#7dd3ff'); lg.addColorStop(0.6, '#c08bff'); lg.addColorStop(1, '#ff8fd0');
-    pctx.fillStyle = lg;
-    roundRect(pctx, TRACK_X0, row.y-7, Math.max(14, fx-TRACK_X0), 14, 7); pctx.fill();
-
-    pctx.beginPath(); pctx.arc(fx, row.y, 21, 0, Math.PI*2);
-    pctx.fillStyle = '#ffffff'; pctx.fill();
-    pctx.lineWidth = 3; pctx.strokeStyle = 'rgba(125,211,255,0.85)'; pctx.stroke();
-  });
-
-  panelTex.needsUpdate = true;
-}
-
-function panelHit(uv) {
-  const x = uv.x * PW, y = (1 - uv.y) * PH;
-  for (let i = 0; i < PANEL_ROWS.length; i++) {
-    const row = PANEL_ROWS[i];
-    if (y > row.y - 52 && y < row.y + 52) {
-      let v = (x - TRACK_X0) / (TRACK_X1 - TRACK_X0);
-      v = Math.max(0, Math.min(1, v));
-      setParam(row.key, row.key === 'pulse' ? v*3 : v);
-      return true;
+function step(dt) {
+  var i, p;
+  for (i = 0; i < P.length; i++) {
+    p = P[i]; if (p.pin) continue;
+    var vx = (p.x - p.px) * DAMP, vy = (p.y - p.py) * DAMP, vz = (p.z - p.pz) * DAMP;
+    p.px = p.x; p.py = p.y; p.pz = p.z;
+    p.x += vx; p.y += vy + GRAV * dt * dt; p.z += vz;
+  }
+  for (var it = 0; it < ITER; it++) {
+    for (i = 0; i < S.length; i++) {
+      var s = S[i], A = P[s.a], B = P[s.b];
+      var dx = B.x - A.x, dy = B.y - A.y, dz = B.z - A.z;
+      var d = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1e-6;
+      var diff = (d - s.len) / d;
+      var mA = A.pin ? 0 : (B.pin ? 1 : .5), mB = B.pin ? 0 : (A.pin ? 1 : .5);
+      A.x += dx * diff * mA; A.y += dy * diff * mA; A.z += dz * diff * mA;
+      B.x -= dx * diff * mB; B.y -= dy * diff * mB; B.z -= dz * diff * mB;
+    }
+    for (i = 0; i < P.length; i++) {
+      p = P[i];
+      if (!p.pin && p.y < GROUND) { p.y = GROUND; p.px += (p.x - p.px) * .5; }
     }
   }
-  return false;
+  for (i = 0; i < P.length; i++) updateLock(i, dt);
+}
+function maxY() { var h = 0; for (var i = 0; i < P.length; i++) if (P[i].y > h) h = P[i].y; return h; }
+function avgWobble() {
+  var s = 0, n = 0;
+  for (var i = 0; i < P.length; i++) if (!P[i].pin) { s += speed(P[i]); n++; }
+  return n ? s / n : 0;
 }
 
-/* =========================================================================
-   9. PARAMETER PLUMBING — DOM sliders <-> uniforms <-> spatial panel
-   ========================================================================= */
-const el = {
-  sPulse: document.getElementById('sPulse'),
-  sDensity: document.getElementById('sDensity'),
-  sSpectrum: document.getElementById('sSpectrum'),
-  vPulse: document.getElementById('vPulse'),
-  vDensity: document.getElementById('vDensity'),
-  vSpectrum: document.getElementById('vSpectrum'),
-  enter: document.getElementById('enter'),
-  ignite: document.getElementById('ignite'),
-  audio: document.getElementById('audio'),
-  dot: document.getElementById('dot'),
-  statTxt: document.getElementById('statTxt'),
-  modeTxt: document.getElementById('modeTxt'),
-  overlay: document.getElementById('overlay'),
-  inxr: document.getElementById('inxr'),
-  boot: document.getElementById('boot'),
-  hint: document.getElementById('hint')
-};
+/* ─────────────────────────────────────── 구조 분석 · 흐름 */
+var CHANNELS = [
+  { id: 'up',   up: true,  hue: [.40, .52], rate: 0 },   // 청록 ~ 연두
+  { id: 'down', up: false, hue: [.80, .95], rate: 0 }    // 자홍 ~ 분홍
+];
+var flowState = { hop: [], carry: [], groundContacts: 0, apex: -1, up: 0, down: 0, equity: 1 };
 
-function fill(input) {
-  const p = (input.value - input.min) / (input.max - input.min) * 100;
-  input.style.setProperty('--fill', p + '%');
-}
-
-function setParam(key, value, fromDOM) {
-  state[key] = value;
-
-  if (key === 'pulse') {
-    coreUniforms.uPulse.value = cageUniforms.uPulse.value =
-      shellUniforms.uPulse.value = discUniforms.uPulse.value = pUniforms.uPulse.value = value;
-    el.vPulse.textContent = value.toFixed(2) + '×';
-    if (!fromDOM) { el.sPulse.value = Math.round(value*100); }
-    fill(el.sPulse);
-  } else if (key === 'density') {
-    const n = applyDensity();
-    el.vDensity.textContent = n.toLocaleString();
-    if (!fromDOM) { el.sDensity.value = Math.round(value*100); }
-    fill(el.sDensity);
-  } else if (key === 'spectrum') {
-    coreUniforms.uSpectrum.value = cageUniforms.uSpectrum.value =
-      shellUniforms.uSpectrum.value = discUniforms.uSpectrum.value = pUniforms.uSpectrum.value = value;
-    const hue = Math.round(value*360);
-    el.vSpectrum.textContent = hue + '°';
-    if (!fromDOM) { el.sSpectrum.value = hue; }
-    fill(el.sSpectrum);
-    const c = new THREE.Color().setHSL(value, 0.7, 0.6);
-    coreLight.color.copy(c);
-    rimLight.color.setHSL((value + 0.12) % 1, 0.65, 0.62);
-    orbitLight.color.setHSL((value + 0.42) % 1, 0.75, 0.6);
-    shards.forEach(function (s) { s.material.emissive.setHSL((value + 0.5) % 1, 0.6, 0.16); });
+function analyze() {
+  var n = P.length, i, k;
+  var adj = []; for (i = 0; i < n; i++) adj.push([]);
+  for (i = 0; i < S.length; i++) {
+    if (!isLocked(S[i].a) || !isLocked(S[i].b)) continue;
+    adj[S[i].a].push(S[i].b); adj[S[i].b].push(S[i].a);
   }
-  drawPanel();
-}
-
-el.sPulse.addEventListener('input', function () { setParam('pulse',    this.value/100, true); });
-el.sDensity.addEventListener('input', function () { setParam('density',  this.value/100, true); });
-el.sSpectrum.addEventListener('input', function () { setParam('spectrum', this.value/360, true); });
-
-function ignite() {
-  state.burst = 1.0;
-  blip(660, 0.20);
-}
-el.ignite.addEventListener('click', ignite);
-
-/* ------------------------------------------------- procedural ambient audio */
-let actx = null, drone = null;
-function initAudio() {
-  const AC = window.AudioContext || window.webkitAudioContext;
-  if (!AC) return null;
-  actx = new AC();
-  const master = actx.createGain(); master.gain.value = 0.0; master.connect(actx.destination);
-  const filt = actx.createBiquadFilter(); filt.type = 'lowpass'; filt.frequency.value = 620; filt.Q.value = 6;
-  filt.connect(master);
-  [55, 82.5, 110.3, 164.8].forEach(function (f, i) {
-    const o = actx.createOscillator();
-    o.type = i % 2 ? 'sawtooth' : 'sine';
-    o.frequency.value = f;
-    o.detune.value = (i - 1.5) * 7;
-    const g = actx.createGain(); g.gain.value = 0.16 / (i + 1);
-    o.connect(g); g.connect(filt); o.start();
-  });
-  const lfo = actx.createOscillator(); lfo.frequency.value = 0.08;
-  const lg = actx.createGain(); lg.gain.value = 280;
-  lfo.connect(lg); lg.connect(filt.frequency); lfo.start();
-  return { master: master, filt: filt };
-}
-function blip(freq, dur) {
-  if (!actx || !drone) return;
-  const o = actx.createOscillator(), g = actx.createGain();
-  o.type = 'triangle'; o.frequency.setValueAtTime(freq, actx.currentTime);
-  o.frequency.exponentialRampToValueAtTime(freq*0.35, actx.currentTime + dur);
-  g.gain.setValueAtTime(0.0001, actx.currentTime);
-  g.gain.exponentialRampToValueAtTime(0.10, actx.currentTime + 0.012);
-  g.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime + dur);
-  o.connect(g); g.connect(actx.destination); o.start(); o.stop(actx.currentTime + dur + 0.05);
-}
-el.audio.addEventListener('click', function () {
-  try {
-    if (!drone) drone = initAudio();
-    if (!drone) return;
-    if (actx.state === 'suspended') actx.resume();
-    const on = el.audio.dataset.on === '1';
-    drone.master.gain.linearRampToValueAtTime(on ? 0.0 : 0.30, actx.currentTime + 0.7);
-    el.audio.dataset.on = on ? '0' : '1';
-  } catch (e) { el.audio.disabled = true; }
-});
-
-/* =========================================================================
-   10. POINTER — orbit drag, hover parallax, dolly, double-tap burst
-   ========================================================================= */
-const pointer  = { x: 0, y: 0 };          // -1..1, drives parallax
-// spin.x starts tilted so the accretion ring opens into an ellipse instead of
-// collapsing to a flat line through the middle of the frame.
-const spin     = { y: 0, x: 0.30, vy: 0, vx: 0 };
-const drag     = { on: false, px: 0, py: 0, moved: 0 };
-let   dolly    = 6.0;
-let   lastTap  = 0;
-
-canvas.addEventListener('pointerdown', function (e) {
-  drag.on = true; drag.px = e.clientX; drag.py = e.clientY; drag.moved = 0;
-  canvas.setPointerCapture(e.pointerId);
-});
-canvas.addEventListener('pointermove', function (e) {
-  pointer.x = (e.clientX / window.innerWidth)  * 2 - 1;
-  pointer.y = (e.clientY / window.innerHeight) * 2 - 1;
-  if (!drag.on) return;
-  const dx = e.clientX - drag.px, dy = e.clientY - drag.py;
-  drag.px = e.clientX; drag.py = e.clientY;
-  drag.moved += Math.abs(dx) + Math.abs(dy);
-  spin.vy += dx * 0.00042;
-  spin.vx += dy * 0.00030;
-});
-function endDrag(e) {
-  if (!drag.on) return;
-  drag.on = false;
-  try { canvas.releasePointerCapture(e.pointerId); } catch (err) {}
-  if (drag.moved < 8) {
-    const now = performance.now();
-    if (now - lastTap < 320) ignite();
-    lastTap = now;
+  var hop = []; for (i = 0; i < n; i++) hop.push(-1);
+  var q = [];
+  for (i = 0; i < n; i++) if (P[i].pin) { hop[i] = 0; q.push(i); }
+  for (var h = 0; h < q.length; h++) {
+    var cur = q[h];
+    for (k = 0; k < adj[cur].length; k++) {
+      var nb = adj[cur][k];
+      if (hop[nb] < 0) { hop[nb] = hop[cur] + 1; q.push(nb); }
+    }
   }
-}
-canvas.addEventListener('pointerup', endDrag);
-canvas.addEventListener('pointercancel', endDrag);
-canvas.addEventListener('wheel', function (e) {
-  e.preventDefault();
-  dolly = Math.max(2.6, Math.min(13, dolly + e.deltaY * 0.0032));
-}, { passive: false });
+  var apex = -1, best = .35;
+  for (i = 0; i < n; i++)
+    if (!P[i].pin && isLocked(i) && hop[i] > 0 && P[i].y > best) { best = P[i].y; apex = i; }
 
-// Two-finger pinch zoom on touch devices
-let pinchStart = 0, dollyStart = 0;
-canvas.addEventListener('touchstart', function (e) {
-  if (e.touches.length === 2) {
-    pinchStart = Math.hypot(e.touches[0].clientX-e.touches[1].clientX,
-                            e.touches[0].clientY-e.touches[1].clientY);
-    dollyStart = dolly;
+  // 접점 = 정점에서 실제로 도달 가능한 고정점. 박혀만 있고 위와 안 이어지면 안 센다.
+  var gcList = [], seen = [];
+  for (i = 0; i < n; i++) seen.push(false);
+  if (apex >= 0) {
+    var q2 = [apex]; seen[apex] = true;
+    for (var j = 0; j < q2.length; j++) {
+      var c2 = q2[j];
+      if (P[c2].pin) gcList.push(c2);
+      for (k = 0; k < adj[c2].length; k++)
+        if (!seen[adj[c2][k]]) { seen[adj[c2][k]] = true; q2.push(adj[c2][k]); }
+    }
   }
-}, { passive: true });
-canvas.addEventListener('touchmove', function (e) {
-  if (e.touches.length === 2 && pinchStart) {
-    const d = Math.hypot(e.touches[0].clientX-e.touches[1].clientX,
-                         e.touches[0].clientY-e.touches[1].clientY);
-    dolly = Math.max(2.6, Math.min(13, dollyStart * (pinchStart/d)));
+  var gc = gcList.length;
+  var carry = [];
+  for (i = 0; i < S.length; i++)
+    carry.push(isLocked(S[i].a) && isLocked(S[i].b) && seen[S[i].a] && seen[S[i].b]);
+
+  // 상향은 중력을 거스른다 — 높을수록 비싸고, 밑이 넓을수록 많이 올라간다.
+  var apexH = apex >= 0 ? P[apex].y : 0;
+  var up = apex < 0 ? 0 : gc * .62 / (1 + apexH * .5);
+
+  var eq = 1;
+  if (gcList.length > 1 && apex >= 0) {
+    var mn = 1e9, mx = 0;
+    for (i = 0; i < gcList.length; i++) {
+      var dd = d3(P[gcList[i]], P[apex]);
+      if (dd < mn) mn = dd;
+      if (dd > mx) mx = dd;
+    }
+    eq = mx > 0 ? mn / mx : 1;
   }
-}, { passive: true });
+  var down = apex < 0 ? 0 : 1.35 * (.45 + .55 * eq);
 
-/* =========================================================================
-   11. WEBXR — hand-rolled entry point (r128 global build has no VRButton)
-   ========================================================================= */
-const xrRay = new THREE.Raycaster();
-const xrControllers = [];
-const tmpMat = new THREE.Matrix4();
-const activePointers = new Set();
-
-for (let i = 0; i < 2; i++) {
-  const c = renderer.xr.getController(i);
-  c.addEventListener('selectstart', function () { activePointers.add(c); onXRSelect(c, true); });
-  c.addEventListener('selectend',   function () { activePointers.delete(c); });
-  c.addEventListener('connected', function (ev) { c.userData.src = ev.data; });
-  c.addEventListener('disconnected', function () { c.userData.src = null; activePointers.delete(c); });
-
-  // Procedural pointer beam
-  const beamGeo = new THREE.BufferGeometry().setFromPoints([
-    new THREE.Vector3(0,0,0), new THREE.Vector3(0,0,-1)
-  ]);
-  const beam = new THREE.Line(beamGeo, new THREE.LineBasicMaterial({
-    color: 0x7dd3ff, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false
-  }));
-  beam.scale.z = 2.4;
-  c.add(beam);
-  scene.add(c);
-  xrControllers.push(c);
+  flowState = { hop: hop, carry: carry, groundContacts: gc, apex: apex, up: up, down: down, equity: eq };
+  CHANNELS[0].rate = up; CHANNELS[1].rate = down;
 }
 
-function onXRSelect(controller, isStart) {
-  tmpMat.identity().extractRotation(controller.matrixWorld);
-  xrRay.ray.origin.setFromMatrixPosition(controller.matrixWorld);
-  xrRay.ray.direction.set(0, 0, -1).applyMatrix4(tmpMat);
-
-  if (panel.visible) {
-    const hits = xrRay.intersectObject(panel, false);
-    if (hits.length && hits[0].uv) { panelHit(hits[0].uv); return; }
+/* ─────────────────────────────────────── 놓을 자리 */
+var spots = [];
+function triArea(a, b, c) {
+  var ux = b.x - a.x, uy = b.y - a.y, uz = b.z - a.z;
+  var vx = c.x - a.x, vy = c.y - a.y, vz = c.z - a.z;
+  var cx = uy * vz - uz * vy, cy = uz * vx - ux * vz, cz = ux * vy - uy * vx;
+  return .5 * Math.sqrt(cx * cx + cy * cy + cz * cz);
+}
+function supportsFor(pos) {
+  var out = [];
+  for (var i = 0; i < P.length; i++) {
+    if (!isLocked(i)) continue;
+    var d = d3(pos, P[i]);
+    if (d <= REACH && d > .45) out.push({ i: i, d: d });
   }
-  const coreHits = xrRay.intersectObjects([shell, plasma], false);
-  if (coreHits.length && isStart) ignite();
-}
-
-function pollXRPointers() {
-  if (!activePointers.size || !panel.visible) return;
-  activePointers.forEach(function (c) {
-    tmpMat.identity().extractRotation(c.matrixWorld);
-    xrRay.ray.origin.setFromMatrixPosition(c.matrixWorld);
-    xrRay.ray.direction.set(0, 0, -1).applyMatrix4(tmpMat);
-    const hits = xrRay.intersectObject(panel, false);
-    if (hits.length && hits[0].uv) panelHit(hits[0].uv);
-  });
-}
-
-function setStatus(text, cls) {
-  el.statTxt.textContent = text;
-  el.dot.className = 'dot' + (cls ? ' ' + cls : '');
-}
-
-async function negotiateXR() {
-  if (!navigator.xr || !window.isSecureContext) return null;
-  try { if (await navigator.xr.isSessionSupported('immersive-ar')) return 'immersive-ar'; } catch (e) {}
-  try { if (await navigator.xr.isSessionSupported('immersive-vr')) return 'immersive-vr'; } catch (e) {}
+  if (out.length < 3) return null;
+  out.sort(function (a, b) { return a.d - b.d; });
+  var lim = Math.min(out.length, 7);
+  for (var a = 0; a < lim - 2; a++)
+    for (var b = a + 1; b < lim - 1; b++)
+      for (var c = b + 1; c < lim; c++)
+        if (triArea(P[out[a].i], P[out[b].i], P[out[c].i]) > .42)
+          return [out[a].i, out[b].i, out[c].i];
   return null;
 }
+function nearestLocked(pos) {
+  var best = -1, bd = REACH;
+  for (var i = 0; i < P.length; i++) {
+    if (!isLocked(i)) continue;
+    var d = d3(pos, P[i]);
+    if (d < bd && d > .5) { bd = d; best = i; }
+  }
+  return best;
+}
+function computeSpots() {
+  spots = [];
+  var locked = [], i, k;
+  for (i = 0; i < P.length; i++) if (isLocked(i)) locked.push(i);
+  if (!locked.length) return;
+  locked.sort(function (a, b) { return P[b].y - P[a].y; });
+  var cand = [];
 
-let xrSession = null;
-
-async function enterXR() {
-  if (xrSession) { xrSession.end(); return; }
-  el.enter.disabled = true;
-  try {
-    const opts = {
-      optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking', 'layers', 'anchors']
-    };
-    if (state.xrMode === 'immersive-ar') {
-      opts.optionalFeatures.push('dom-overlay', 'hit-test');
-      opts.domOverlay = { root: el.overlay };
+  // (1) 공중 — 사면체를 닫아 올라간다
+  var dirs = [[0, 1.25, 0]];
+  for (var a = 0; a < 6; a++) {
+    var th = a / 6 * Math.PI * 2;
+    dirs.push([Math.cos(th) * 1.05, .95, Math.sin(th) * 1.05]);
+  }
+  var seeds = locked.slice(0, 7);
+  for (var s = 0; s < seeds.length; s++) {
+    var sp = P[seeds[s]];
+    for (var d = 0; d < dirs.length; d++) {
+      var pos = { x: sp.x + dirs[d][0], y: sp.y + dirs[d][1], z: sp.z + dirs[d][2] };
+      if (pos.y < .55) continue;
+      var bad = false;
+      for (k = 0; k < P.length; k++) if (d3(pos, P[k]) < .8) { bad = true; break; }
+      if (bad) continue;
+      var sup = supportsFor(pos);
+      if (!sup) continue;
+      cand.push({ x: pos.x, y: pos.y, z: pos.z, base: sup, ground: false, score: pos.y });
     }
-    const session = await navigator.xr.requestSession(state.xrMode, opts);
-
-    // Probe the reference space BEFORE handing the session to three,
-    // so a missing local-floor never throws mid-attach.
-    state.floorRef = true;
-    try { await session.requestReferenceSpace('local-floor'); }
-    catch (e) { state.floorRef = false; }
-    renderer.xr.setReferenceSpaceType(state.floorRef ? 'local-floor' : 'local');
-
-    session.addEventListener('end', onXREnd);
-    await renderer.xr.setSession(session);
-    xrSession = session;
-    onXRStart();
-  } catch (err) {
-    setStatus('XR DENIED', 'warn');
-    el.hint.textContent = 'Spatial session declined: ' + (err && err.message ? err.message : err);
-  } finally {
-    el.enter.disabled = false;
+  }
+  // (2) 바닥 — 새 접점을 심는다. 상향 용량은 접점 수에서 나오므로 이것이 "넓히기" 다.
+  for (i = 0; i < P.length; i++) {
+    if (!P[i].pin) continue;
+    var pp = P[i], rad = Math.sqrt(pp.x * pp.x + pp.z * pp.z) || 1;
+    for (var m = -1; m <= 1; m++) {
+      var ang = Math.atan2(pp.z, pp.x) + m * .52;
+      var gp = { x: Math.cos(ang) * (rad + 1.25), y: 0, z: Math.sin(ang) * (rad + 1.25) };
+      var bad2 = false;
+      for (k = 0; k < P.length; k++) if (d3(gp, P[k]) < 1.05) { bad2 = true; break; }
+      if (bad2) continue;
+      var anchor = nearestLocked(gp);
+      if (anchor < 0) continue;
+      cand.push({ x: gp.x, y: 0, z: gp.z, base: [anchor], ground: true, score: -.5 });
+    }
+  }
+  cand.sort(function (a, b) { return b.score - a.score; });
+  var nAir = 0, nGnd = 0;
+  for (var c = 0; c < cand.length && spots.length < 5; c++) {
+    if (cand[c].ground ? nGnd >= 2 : nAir >= 3) continue;
+    var dup = false;
+    for (var g = 0; g < spots.length; g++) if (d3(cand[c], spots[g]) < 1.6) { dup = true; break; }
+    if (dup) continue;
+    spots.push(cand[c]);
+    if (cand[c].ground) nGnd++; else nAir++;
   }
 }
 
-function onXRStart() {
-  state.inXR = true;
-  el.enter.textContent = 'EXIT SPATIAL REALITY';
-  el.modeTxt.textContent = state.xrMode === 'immersive-ar' ? 'SPATIAL AR' : 'SPATIAL VR';
-  setStatus('IMMERSIVE', '');
-  el.overlay.classList.add('hidden');
-  el.inxr.classList.add('on');
-  document.body.classList.add('presenting');
+/* ─────────────────────────────────────── 게임 */
+var game = { active: -1, won: false };
+function setupBuild() {
+  mode = 'build'; P = []; S = [];
+  var idx = [];
+  for (var k = 0; k < 3; k++) {
+    var a = k / 3 * Math.PI * 2 - Math.PI / 2;
+    idx.push(addPoint(Math.cos(a) * 1.25, 0, Math.sin(a) * 1.25, true));
+  }
+  addStick(idx[0], idx[1]); addStick(idx[1], idx[2]); addStick(idx[2], idx[0]);
+  game.active = -1; game.won = false;
+  analyze(); computeSpots();
+  say('밝은 자리를 골라 클릭하라',
+      '공중은 <b>올리는 수</b>, 바닥은 <b>넓히는 수</b>다. 공중에 세우면 곧바로 쓰러지기 시작한다');
+  setButtons();
+}
+function supporters() {
+  var out = [];
+  if (game.active < 0) return out;
+  for (var i = 0; i < P.length; i++) {
+    if (i === game.active || !isLocked(i)) continue;
+    if (d3(P[i], P[game.active]) > REACH) continue;
+    var dup = false;
+    for (var k = 0; k < S.length; k++)
+      if ((S[k].a === i && S[k].b === game.active) || (S[k].b === i && S[k].a === game.active)) dup = true;
+    if (!dup) out.push(i);
+  }
+  return out;
+}
+function support(from) {
+  if (game.active < 0) return;
+  if (!addStick(from, game.active)) return;
+  if (stickCount(game.active) === 2)
+    say('아직 흔들린다', '막대 2개는 <b>경첩</b>이다 — 두 점을 잇는 축을 중심으로 계속 돈다. 하나 더');
+}
 
-  // Project the core out of the browser window into the room
-  world.scale.setScalar(0.30);
-  world.position.set(0, state.floorRef ? 1.42 : 0.05, -1.55);
+/* ─────────────────────────────────────── 비교 시연 */
+var demo = { left: -1, right: -1, said: false };
+function setupDemo() {
+  mode = 'demo'; P = []; S = [];
+  function tri(ox) {
+    var t = [];
+    for (var k = 0; k < 3; k++) {
+      var a = k / 3 * Math.PI * 2 - Math.PI / 2;
+      t.push(addPoint(ox + Math.cos(a), 0, Math.sin(a), true));
+    }
+    addStick(t[0], t[1]); addStick(t[1], t[2]); addStick(t[2], t[0]);
+    return t;
+  }
+  var L = tri(-2.2), R = tri(2.2);
+  demo.left = addPoint(-2.2, 1.45, 0, false);
+  addStick(L[0], demo.left); addStick(L[1], demo.left);
+  demo.right = addPoint(2.2, 1.45, 0, false);
+  addStick(R[0], demo.right); addStick(R[1], demo.right); addStick(R[2], demo.right);
+  demo.said = false; spots = []; game.active = -1;
+  say('왼쪽은 막대 2개, 오른쪽은 3개', '가만히 두고 무슨 일이 벌어지는지 보라');
+  setButtons();
+}
+
+/* ─────────────────────────────────────── 테마 */
+var THEMES = {
+  dark: {
+    bg: 0x07080b, fog: .030, grid: [0x252b35, 0x12151c],
+    shell: [.62, .70, .86], core: [.88, .92, 1.0],      // 아주 옅은 청보라
+    stick: [.68, .73, .84], spot: [.55, .90, .84],      // 자리는 상향 네온의 옅은 판
+    goal: 0xe8ecf2, goalOp: .22,
+    blend: THREE.AdditiveBlending, pLum: .60, pOp: .95,
+    hemi: [0xaab4c4, 0x0a0b10, .95], key: .85, rim: .45
+  },
+  light: {
+    bg: 0xeef1f6, fog: .020, grid: [0xc0c8d6, 0xdbe1ea],
+    shell: [.36, .42, .55], core: [.14, .19, .30],
+    stick: [.32, .38, .50], spot: [.05, .52, .45],
+    goal: 0x39415a, goalOp: .3,
+    blend: THREE.NormalBlending, pLum: .40, pOp: 1,
+    hemi: [0xffffff, 0x9aa4b8, 1.15], key: .55, rim: .3
+  }
+};
+var themeName = (window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches) ? 'light' : 'dark';
+var T = THEMES[themeName];
+
+/* ─────────────────────────────────────── 렌더 */
+var canvas = document.getElementById('c');
+var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+renderer.xr.enabled = true;
+
+var scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(T.bg, T.fog);
+var camera = new THREE.PerspectiveCamera(46, 1, .1, 200);
+
+// 모든 게임 오브젝트는 여기 들어간다. VR 에서는 이 그룹을 통째로 축소·이동한다.
+var world = new THREE.Group(); scene.add(world);
+
+var hemi = new THREE.HemisphereLight(T.hemi[0], T.hemi[1], T.hemi[2]); scene.add(hemi);
+var key = new THREE.DirectionalLight(0xffffff, T.key); key.position.set(3, 6, 4); scene.add(key);
+var rim = new THREE.DirectionalLight(0xc8d4e4, T.rim); rim.position.set(-4, 2, -3); scene.add(rim);
+var grid = null;
+function buildGrid() {
+  if (grid) { world.remove(grid); grid.geometry.dispose(); grid.material.dispose(); }
+  grid = new THREE.GridHelper(40, 80, T.grid[0], T.grid[1]);
+  world.add(grid);
+}
+buildGrid();
+
+var goalRing = new THREE.Mesh(new THREE.TorusGeometry(1.7, .008, 6, 80),
+  new THREE.MeshBasicMaterial({ color: T.goal, transparent: true, opacity: T.goalOp }));
+goalRing.rotation.x = Math.PI / 2; world.add(goalRing);
+
+// 연결 지점 — 반투명 껍질 + 안쪽 코어. 두 겹이라 입체로 읽히고, 아주 옅게 물들어 있다.
+var shellGeo = new THREE.OctahedronGeometry(.185, 0);
+var coreGeo = new THREE.OctahedronGeometry(.085, 0);
+var stickGeo = new THREE.CylinderGeometry(.028, .028, 1, 6); stickGeo.translate(0, .5, 0);
+var footGeo = new THREE.RingGeometry(.2, .235, 28); footGeo.rotateX(-Math.PI / 2);
+var shells = [], cores = [], stickMeshes = [], footMeshes = [], spotMeshes = [];
+
+var timerRing = new THREE.Mesh(new THREE.TorusGeometry(.42, .012, 6, 48),
+  new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: .85 }));
+timerRing.visible = false; world.add(timerRing);
+
+function makeSpot() {
+  var g = new THREE.Group();
+  var shell = new THREE.Mesh(new THREE.OctahedronGeometry(.22, 0),
+    new THREE.MeshBasicMaterial({ transparent: true, opacity: .26, wireframe: true }));
+  var core = new THREE.Mesh(coreGeo, new THREE.MeshBasicMaterial({ transparent: true, opacity: .9 }));
+  var halo = new THREE.Mesh(new THREE.TorusGeometry(.36, .009, 6, 40),
+    new THREE.MeshBasicMaterial({ transparent: true, opacity: .6 }));
+  halo.rotation.x = Math.PI / 2;
+  var beamGeo = new THREE.CylinderGeometry(.005, .005, 1, 4); beamGeo.translate(0, -.5, 0);
+  var beam = new THREE.Mesh(beamGeo, new THREE.MeshBasicMaterial({ transparent: true, opacity: .16 }));
+  g.add(shell); g.add(core); g.add(halo); g.add(beam);
+  g.userData = { shell: shell, core: core, halo: halo, beam: beam };
+  world.add(g); return g;
+}
+
+// 파티클 — 화면에서 유일하게 진한 색. 흐르는 것만이 살아 있다.
+var PPC = 340, _hsl = new THREE.Color();
+CHANNELS.forEach(function (ch) {
+  var geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(PPC * 3), 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(PPC * 3), 3));
+  ch.pts = new THREE.Points(geo, new THREE.PointsMaterial({
+    size: .085, vertexColors: true, transparent: true, depthWrite: false, sizeAttenuation: true }));
+  ch.pts.frustumCulled = false;
+  world.add(ch.pts);
+  ch.items = [];
+  for (var i = 0; i < PPC; i++) ch.items.push({ s: -1, t: 0, h: Math.random() });
+});
+function paintParticles() {
+  CHANNELS.forEach(function (ch) {
+    var col = ch.pts.geometry.attributes.color.array;
+    for (var i = 0; i < PPC; i++) {
+      // 파티클마다 채널 색상대 안에서 색이 흩어진다 — "다양한 네온색"
+      _hsl.setHSL(ch.hue[0] + ch.items[i].h * (ch.hue[1] - ch.hue[0]), 1, T.pLum);
+      col[i * 3] = _hsl.r; col[i * 3 + 1] = _hsl.g; col[i * 3 + 2] = _hsl.b;
+    }
+    ch.pts.geometry.attributes.color.needsUpdate = true;
+    ch.pts.material.blending = T.blend;
+    ch.pts.material.opacity = T.pOp;
+    ch.pts.material.needsUpdate = true;
+  });
+}
+function applyTheme(name) {
+  themeName = name; T = THEMES[name];
+  document.documentElement.dataset.theme = name;
+  scene.background = new THREE.Color(T.bg);
+  scene.fog.color.setHex(T.bg); scene.fog.density = T.fog;
+  hemi.color.setHex(T.hemi[0]); hemi.groundColor.setHex(T.hemi[1]); hemi.intensity = T.hemi[2];
+  key.intensity = T.key; rim.intensity = T.rim;
+  goalRing.material.color.setHex(T.goal); goalRing.material.opacity = T.goalOp;
+  buildGrid(); paintParticles();
+  document.getElementById('bTheme').textContent = name === 'dark' ? '라이트' : '다크';
+}
+
+var UP = new THREE.Vector3(0, 1, 0);
+var _a = new THREE.Vector3(), _b = new THREE.Vector3(), _d = new THREE.Vector3();
+
+function syncParticles(dt) {
+  var carrying = [];
+  for (var i = 0; i < S.length; i++) if (flowState.carry[i]) carrying.push(i);
+  CHANNELS.forEach(function (ch) {
+    var pos = ch.pts.geometry.attributes.position.array;
+    var want = Math.min(PPC, Math.round(ch.rate * 140));
+    for (var i = 0; i < PPC; i++) {
+      var it = ch.items[i];
+      if (i >= want || !carrying.length) { pos[i * 3 + 1] = -999; it.s = -1; continue; }
+      if (it.s < 0 || it.s >= S.length || !flowState.carry[it.s]) {
+        it.s = carrying[(Math.random() * carrying.length) | 0]; it.t = Math.random();
+      }
+      it.t += dt * 1.15;
+      if (it.t > 1) { it.t = 0; it.s = carrying[(Math.random() * carrying.length) | 0]; }
+      var st = S[it.s], A = P[st.a], B = P[st.b];
+      var lo = flowState.hop[st.a] <= flowState.hop[st.b] ? A : B;
+      var hi = (lo === A) ? B : A;
+      var f = ch.up ? lo : hi, g = ch.up ? hi : lo, u = it.t;
+      pos[i * 3] = f.x + (g.x - f.x) * u;
+      pos[i * 3 + 1] = f.y + (g.y - f.y) * u;
+      pos[i * 3 + 2] = f.z + (g.z - f.z) * u;
+    }
+    ch.pts.geometry.attributes.position.needsUpdate = true;
+  });
+}
+
+function syncMeshes(t) {
+  var i, sup = supporters(), isSup = {};
+  sup.forEach(function (k) { isSup[k] = true; });
+
+  while (shells.length < P.length) {
+    var sh = new THREE.Mesh(shellGeo, new THREE.MeshStandardMaterial({
+      transparent: true, opacity: .4, roughness: .25, metalness: .1,
+      flatShading: true, depthWrite: false }));
+    world.add(sh); shells.push(sh);
+    var co = new THREE.Mesh(coreGeo, new THREE.MeshStandardMaterial({
+      transparent: true, opacity: .9, roughness: .2, metalness: .3, flatShading: true }));
+    world.add(co); cores.push(co);
+    var ft = new THREE.Mesh(footGeo, new THREE.MeshBasicMaterial({
+      transparent: true, opacity: .3, side: THREE.DoubleSide }));
+    world.add(ft); footMeshes.push(ft);
+  }
+  for (i = 0; i < shells.length; i++) {
+    var vis = i < P.length;
+    shells[i].visible = cores[i].visible = footMeshes[i].visible = vis;
+    if (!vis) continue;
+    var p = P[i];
+    shells[i].position.set(p.x, p.y, p.z);
+    cores[i].position.set(p.x, p.y, p.z);
+    shells[i].rotation.y = t * .25 + i;      // 아주 느린 자전 — 정지 화면이 되지 않게
+    cores[i].rotation.y = -t * .35 + i;      // 반대로 돌아 두 겹이 분리돼 보인다
+    // 상태는 색상이 아니라 밝기·투명도·크기로 말한다. 진한 색은 흐름만 가진다.
+    var lum = 1, op = .34, sc = 1;
+    if (p.pin) { lum = 1.05; op = .42; }
+    if (isLocked(i) && !p.pin) { lum = 1.18; op = .5; }
+    if (!p.pin && !isLocked(i)) { lum = .8; op = .34; sc = 1.12; }
+    if (isSup[i]) { lum = 1.5; op = .95; sc = 1.45 + Math.sin(t * 7) * .2; }
+    shells[i].material.color.setRGB(T.shell[0] * lum, T.shell[1] * lum, T.shell[2] * lum);
+    shells[i].material.opacity = op;
+    shells[i].scale.setScalar(sc);
+    cores[i].material.color.setRGB(T.core[0] * lum, T.core[1] * lum, T.core[2] * lum);
+    cores[i].material.opacity = Math.min(1, op * 2.1);
+    cores[i].scale.setScalar(sc * (isSup[i] ? 1.3 : 1));
+    footMeshes[i].position.set(p.x, .008, p.z);
+    var k2 = 1 + p.y * .3;
+    footMeshes[i].scale.setScalar(k2);
+    footMeshes[i].material.color.setRGB(T.shell[0], T.shell[1], T.shell[2]);
+    footMeshes[i].material.opacity = (p.pin ? .36 : .26) / (k2 * k2);
+  }
+
+  while (stickMeshes.length < S.length) {
+    var sm = new THREE.Mesh(stickGeo, new THREE.MeshStandardMaterial({
+      roughness: .35, metalness: .15, transparent: true, opacity: .75 }));
+    world.add(sm); stickMeshes.push(sm);
+  }
+  for (i = 0; i < stickMeshes.length; i++) {
+    var v = i < S.length; stickMeshes[i].visible = v;
+    if (!v) continue;
+    var A = P[S[i].a], B = P[S[i].b];
+    _a.set(A.x, A.y, A.z); _b.set(B.x, B.y, B.z); _d.subVectors(_b, _a);
+    var sk = stickMeshes[i];
+    sk.position.copy(_a);
+    sk.quaternion.setFromUnitVectors(UP, _d.clone().normalize());
+    sk.scale.set(1, _d.length(), 1);
+    // 흔들리는 막대는 어두워진다 — 아직 제 몫을 못 한다는 뜻
+    var mv = Math.max(A.pin ? 0 : speed(A), B.pin ? 0 : speed(B));
+    var calm = 1 - Math.min(1, mv * 55);
+    var g2 = .62 + calm * .5;
+    sk.material.color.setRGB(T.stick[0] * g2, T.stick[1] * g2, T.stick[2] * g2);
+    sk.material.opacity = .4 + calm * .42;
+  }
+
+  while (spotMeshes.length < spots.length) spotMeshes.push(makeSpot());
+  for (i = 0; i < spotMeshes.length; i++) {
+    var on = (mode === 'build') && (i < spots.length) && (game.active < 0);
+    spotMeshes[i].visible = on;
+    if (!on) continue;
+    var g3 = spots[i], u = spotMeshes[i].userData;
+    spotMeshes[i].position.set(g3.x, g3.y, g3.z);
+    var pulse = 1 + Math.sin(t * 3.2 + i * 1.3) * .12;
+    [u.shell, u.core, u.halo, u.beam].forEach(function (m) {
+      m.material.color.setRGB(T.spot[0], T.spot[1], T.spot[2]);
+    });
+    u.shell.visible = u.core.visible = !g3.ground;
+    u.shell.scale.setScalar(pulse); u.shell.rotation.y = t * .5 + i;
+    u.core.scale.setScalar(pulse);
+    u.halo.scale.setScalar(g3.ground ? pulse * 1.9 : pulse * 1.08);
+    u.halo.rotation.z = t * .6 + i;
+    u.beam.visible = !g3.ground;
+    if (!g3.ground) u.beam.scale.set(1, Math.max(g3.y, .01), 1);
+  }
+
+  var ok = game.active >= 0 && game.active < P.length;
+  timerRing.visible = ok;
+  if (ok) {
+    var ap = P[game.active];
+    timerRing.position.set(ap.x, ap.y, ap.z);
+    timerRing.quaternion.copy(camera.quaternion);
+    var left = Math.max(0, Math.min(1, ap.y / Math.max(ap.born, .01)));
+    timerRing.scale.setScalar(.45 + left * .75);
+    timerRing.material.color.setRGB(T.spot[0], T.spot[1], T.spot[2]);
+    timerRing.material.opacity = .3 + (1 - left) * .6;
+  }
+}
+
+/* ─────────────────────────── 카메라 (데스크톱) */
+var orbit = { yaw: .5, pitch: .2, dist: 11, ty: 1.2 };
+var fitDist = 11, fitTy = 1.2, userZoom = 1;
+var pan = { x: 0, y: 0 };
+var _fwd = new THREE.Vector3(), _right = new THREE.Vector3(), _cup = new THREE.Vector3();
+function autoFrame() {
+  if (!P.length) return;
+  var minY = 1e9, maxYv = -1e9, maxR = 0, i;
+  for (i = 0; i < P.length; i++) {
+    var p = P[i];
+    if (p.y < minY) minY = p.y;
+    if (p.y > maxYv) maxYv = p.y;
+    var r = Math.sqrt(p.x * p.x + p.z * p.z);
+    if (r > maxR) maxR = r;
+  }
+  for (i = 0; i < spots.length; i++) {
+    if (spots[i].y > maxYv) maxYv = spots[i].y;
+    var gr = Math.sqrt(spots[i].x * spots[i].x + spots[i].z * spots[i].z);
+    if (gr > maxR) maxR = gr;
+  }
+  var halfH = Math.max((maxYv - minY) / 2, .9) + .7;
+  var halfW = maxR + 1.0;
+  var vFov = camera.fov * Math.PI / 180;
+  var hFov = 2 * Math.atan(Math.tan(vFov / 2) * camera.aspect);
+  fitDist = Math.max(halfH / (Math.tan(vFov / 2) * .78), halfW / Math.tan(hFov / 2)) + .7;
+  fitTy = (minY + maxYv) / 2;
+}
+function placeCamera() {
+  orbit.dist += (fitDist * userZoom - orbit.dist) * .1;
+  orbit.ty += (fitTy - orbit.ty) * .1;
+  var cp = Math.cos(orbit.pitch);
+  var ox = Math.sin(orbit.yaw) * cp * orbit.dist;
+  var oy = Math.sin(orbit.pitch) * orbit.dist;
+  var oz = Math.cos(orbit.yaw) * cp * orbit.dist;
+  _fwd.set(-ox, -oy, -oz).normalize();
+  _right.crossVectors(_fwd, UP).normalize();
+  _cup.crossVectors(_right, _fwd).normalize();
+  var tx = _right.x * pan.x + _cup.x * pan.y;
+  var ty = orbit.ty + _right.y * pan.x + _cup.y * pan.y;
+  var tz = _right.z * pan.x + _cup.z * pan.y;
+  camera.position.set(tx + ox, ty + oy, tz + oz);
+  camera.lookAt(tx, ty, tz);
+}
+
+/* ─────────────────────────────────────── 조작 (마우스 · VR 공용) */
+var ray = new THREE.Raycaster();
+var _inv = new THREE.Matrix4(), _rot = new THREE.Matrix4();
+function toWorldLocal() {
+  // P[] 좌표는 world 그룹의 로컬 좌표계다. VR 에서 그룹을 축소·이동하므로
+  // 광선을 그 좌표계로 되돌려야 거리 판정이 맞는다. 데스크톱에서는 항등이다.
+  world.updateMatrixWorld();
+  _inv.copy(world.matrixWorld).invert();
+  ray.ray.applyMatrix4(_inv);
+}
+function nearestOfRay(list, maxD) {
+  var best = -1, bestD = maxD;
+  for (var k = 0; k < list.length; k++) {
+    var i = list[k];
+    _a.set(P[i].x, P[i].y, P[i].z);
+    var d = ray.ray.distanceToPoint(_a);
+    if (d < bestD) { bestD = d; best = i; }
+  }
+  return best;
+}
+function nearestSpotRay() {
+  var best = -1, bestD = 1e9;
+  for (var i = 0; i < spots.length; i++) {
+    _a.set(spots[i].x, spots[i].y, spots[i].z);
+    var d = ray.ray.distanceToPoint(_a);
+    if (d < bestD) { bestD = d; best = i; }
+  }
+  return best;
+}
+// 마우스든 컨트롤러든 여기로 들어온다. 규칙이 한 곳에만 있다.
+function act() {
+  if (mode !== 'build') return;
+  if (game.active >= 0) {
+    var sup = supporters();
+    var pick = nearestOfRay(sup, 1.6);
+    if (pick >= 0) support(pick); else if (sup.length) support(sup[0]);
+    return;
+  }
+  var si = nearestSpotRay();
+  if (si < 0) return;
+  var g = spots[si];
+  if (g.ground) {
+    var gi = addPoint(g.x, 0, g.z, true);
+    addStick(g.base[0], gi);
+    analyze(); computeSpots();
+    say('접점을 넓혔다',
+        '땅에 닿은 접점이 <b>' + flowState.groundContacts + '개</b>. 위로 보낼 수 있는 양이 늘었다');
+    return;
+  }
+  var ni = addPoint(g.x, g.y, g.z, false);
+  // 첫 막대를 어디에 거는지는 조준 방향이 정한다 — 매달린 지점이 다르면
+  // 쓰러지는 방향도 달라진다.
+  var anchor = nearestOfRay(g.base, 1e9);
+  addStick(anchor >= 0 ? anchor : g.base[0], ni);
+  game.active = ni; spots = [];
+  say('쓰러지는 중', '<b>빛나는 점들을 클릭해 받쳐라.</b> 막대가 3개여야 멈춘다');
+}
+
+var pointers = {}, nPointers = 0, gesture = null;
+var press = { x: 0, y: 0, moved: 0, multi: false };
+function panScale() { return orbit.dist * .0016; }
+canvas.addEventListener('pointerdown', function (e) {
+  if (!pointers[e.pointerId]) nPointers++;
+  pointers[e.pointerId] = { x: e.clientX, y: e.clientY };
+  if (canvas.setPointerCapture) canvas.setPointerCapture(e.pointerId);
+  if (nPointers === 1) { press.x = e.clientX; press.y = e.clientY; press.moved = 0; press.multi = false; }
+  else { press.multi = true; gesture = null; }
+});
+canvas.addEventListener('pointermove', function (e) {
+  if (!pointers[e.pointerId]) return;
+  pointers[e.pointerId].x = e.clientX; pointers[e.pointerId].y = e.clientY;
+  if (nPointers >= 2) {
+    var ids = Object.keys(pointers), a = pointers[ids[0]], b = pointers[ids[1]];
+    var dx = b.x - a.x, dy = b.y - a.y, dist = Math.sqrt(dx * dx + dy * dy);
+    var mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+    if (gesture) {
+      if (gesture.dist > 8 && dist > 8)
+        userZoom = Math.max(.35, Math.min(4, userZoom * (gesture.dist / dist)));
+      pan.x -= (mx - gesture.mx) * panScale();
+      pan.y += (my - gesture.my) * panScale();
+    }
+    gesture = { dist: dist, mx: mx, my: my };
+    press.moved = 999;
+    return;
+  }
+  var ddx = e.clientX - press.x, ddy = e.clientY - press.y;
+  press.moved += Math.abs(ddx) + Math.abs(ddy);
+  orbit.yaw -= ddx * .007;
+  orbit.pitch = Math.max(-.1, Math.min(1.2, orbit.pitch + ddy * .005));
+  press.x = e.clientX; press.y = e.clientY;
+});
+function endPointer(e) {
+  if (pointers[e.pointerId]) { delete pointers[e.pointerId]; nPointers = Math.max(0, nPointers - 1); }
+  if (nPointers < 2) gesture = null;
+}
+canvas.addEventListener('pointerup', function (e) {
+  var wasDrag = press.moved > 10 || press.multi;
+  endPointer(e);
+  if (nPointers > 0 || wasDrag) return;
+  ray.setFromCamera({ x: (e.clientX / innerWidth) * 2 - 1, y: -(e.clientY / innerHeight) * 2 + 1 }, camera);
+  toWorldLocal();
+  act();
+});
+canvas.addEventListener('pointercancel', endPointer);
+canvas.addEventListener('wheel', function (e) {
+  e.preventDefault();
+  if (e.ctrlKey) userZoom = Math.max(.35, Math.min(4, userZoom * (1 + e.deltaY * .01)));
+  else if (Math.abs(e.deltaX) > .5) {
+    pan.x += e.deltaX * panScale() * .9; pan.y -= e.deltaY * panScale() * .9;
+  } else userZoom = Math.max(.35, Math.min(4, userZoom * (1 + e.deltaY * .0016)));
+}, { passive: false });
+
+/* ─────────────────────────────────────── VR */
+var xrOn = false, xrSession = null, grab = null;
+var ctrls = [renderer.xr.getController(0), renderer.xr.getController(1)];
+ctrls.forEach(function (c) {
+  var g = new THREE.BufferGeometry().setFromPoints(
+    [new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, -1)]);
+  var line = new THREE.Line(g, new THREE.LineBasicMaterial({ transparent: true, opacity: .55 }));
+  line.scale.z = 4;
+  c.add(line);
+  c.userData.squeeze = false;
+  scene.add(c);
+  c.addEventListener('selectstart', function (e) {
+    // 컨트롤러 광선을 world 로컬 좌표계로 되돌려 마우스와 같은 처리를 탄다
+    _rot.identity().extractRotation(e.target.matrixWorld);
+    ray.ray.origin.setFromMatrixPosition(e.target.matrixWorld);
+    ray.ray.direction.set(0, 0, -1).applyMatrix4(_rot).normalize();
+    toWorldLocal();
+    act();
+  });
+  c.addEventListener('squeezestart', function (e) { e.target.userData.squeeze = true; });
+  c.addEventListener('squeezeend', function (e) { e.target.userData.squeeze = false; grab = null; });
+});
+var _p0 = new THREE.Vector3(), _p1 = new THREE.Vector3(), _mid = new THREE.Vector3();
+
+function updateGrab() {
+  // 양손 그립 = 세계를 잡는다. 벌리면 커지고, 나란히 옮기면 따라온다.
+  // 데스크톱의 두 손가락 제스처와 같은 모델이다.
+  if (!(ctrls[0].userData.squeeze && ctrls[1].userData.squeeze)) { grab = null; return; }
+  _p0.setFromMatrixPosition(ctrls[0].matrixWorld);
+  _p1.setFromMatrixPosition(ctrls[1].matrixWorld);
+  _mid.addVectors(_p0, _p1).multiplyScalar(.5);
+  var dist = _p0.distanceTo(_p1);
+  if (!grab) { grab = { mid: _mid.clone(), dist: dist, wp: world.position.clone(), ws: world.scale.x }; return; }
+  var s = grab.ws * (dist / Math.max(grab.dist, .04));
+  world.scale.setScalar(Math.max(.04, Math.min(1.5, s)));
+  world.position.copy(grab.wp).add(_mid).sub(grab.mid);
+}
+function enterVR() {
+  xrOn = true;
+  // 눈앞의 탁상 모형으로 만든다. 양손 그립으로 언제든 키우거나 옮길 수 있다.
+  world.scale.setScalar(.22);
+  world.position.set(0, .85, -.75);
   world.rotation.set(0, 0, 0);
-
-  stars.visible    = state.xrMode !== 'immersive-ar';
-  floorDisc.visible = false;
-  panel.visible    = true;
-  panel.position.set(0, -1.85, 1.15);
-  panel.rotation.set(-0.30, 0, 0);
-  panel.scale.setScalar(2.4);          // compensates the 0.30 world scale
-
-  // Headsets pay for every pixel: shed the shadow pass, keep the particles
-  renderer.shadowMap.enabled = false;
-  pUniforms.uPR.value = 1.0;
-  state.quality = 0.78;
-  applyDensity();
-  drawPanel();
+  document.getElementById('bVR').textContent = 'VR 종료';
 }
-
-function onXREnd() {
-  state.inXR = false;
-  xrSession = null;
-  el.enter.textContent = 'ENTER SPATIAL REALITY';
-  el.modeTxt.textContent = 'WINDOWED 3D';
-  setStatus('READY', '');
-  el.overlay.classList.remove('hidden');
-  el.inxr.classList.remove('on');
-  document.body.classList.remove('presenting');
-
+function exitVR() {
+  xrOn = false; grab = null;
   world.scale.setScalar(1);
-  world.position.set(0, WORLD_Y, 0);
-  stars.visible = true;
-  floorDisc.visible = true;
-  panel.visible = false;
-
-  renderer.shadowMap.enabled = true;
-  pUniforms.uPR.value = DPR();
-  state.quality = 1.0;
-  applyDensity();
-  renderer.setPixelRatio(DPR());
-  resize();
+  world.position.set(0, 0, 0);
+  document.getElementById('bVR').textContent = 'VR 시작';
 }
+renderer.xr.addEventListener('sessionstart', enterVR);
+renderer.xr.addEventListener('sessionend', exitVR);
 
-el.enter.addEventListener('click', enterXR);
+(function setupVR() {
+  var btn = document.getElementById('bVR');
+  if (!navigator.xr || !navigator.xr.isSessionSupported) return;
+  navigator.xr.isSessionSupported('immersive-vr').then(function (ok) {
+    if (!ok) return;
+    btn.style.display = '';
+    btn.onclick = function () {
+      if (xrSession) { xrSession.end(); return; }
+      navigator.xr.requestSession('immersive-vr', {
+        optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking']
+      }).then(function (s) {
+        xrSession = s;
+        s.addEventListener('end', function () { xrSession = null; });
+        renderer.xr.setReferenceSpaceType('local-floor');
+        return renderer.xr.setSession(s);
+      }).catch(function (err) {
+        say('VR 을 시작하지 못했다', String(err && err.message || err));
+      });
+    };
+  }).catch(function () {});
+}());
 
-/* =========================================================================
-   12. RESIZE / VISIBILITY / ADAPTIVE QUALITY
-   ========================================================================= */
+/* ─────────────────────────────────────── HUD */
+var elSay = document.getElementById('say');
+function say(t, s) {
+  elSay.querySelector('b').textContent = t;
+  elSay.querySelector('i').innerHTML = s || '';
+}
+var tagL = document.createElement('div'); tagL.className = 'tag'; document.body.appendChild(tagL);
+var tagR = document.createElement('div'); tagR.className = 'tag'; document.body.appendChild(tagR);
+var _proj = new THREE.Vector3();
+function placeTag(el, idx, html, cls, dy) {
+  if (xrOn || idx < 0 || idx >= P.length) { el.classList.remove('on'); return; }
+  _proj.set(P[idx].x, P[idx].y + (dy || .6), P[idx].z).project(camera);
+  el.style.left = ((_proj.x * .5 + .5) * innerWidth) + 'px';
+  el.style.top = ((-_proj.y * .5 + .5) * innerHeight) + 'px';
+  el.className = 'tag on ' + (cls || '');
+  el.innerHTML = html;
+}
+function setButtons() {
+  var b = document.getElementById('bDemo');
+  b.classList.toggle('on', mode === 'demo');
+  b.textContent = mode === 'demo' ? '돌아가기' : '왜 흔들리지?';
+  goalRing.visible = (mode === 'build');
+  document.getElementById('hud').style.display = mode === 'build' ? '' : 'none';
+}
+function resetView() { userZoom = 1; pan.x = pan.y = 0; orbit.yaw = .5; orbit.pitch = .2; }
+document.getElementById('bReset').onclick = function () {
+  resetView(); if (mode === 'demo') setupDemo(); else setupBuild();
+};
+document.getElementById('bDemo').onclick = function () {
+  resetView(); if (mode === 'demo') setupBuild(); else setupDemo();
+};
+document.getElementById('bSpeed').onclick = function (e) {
+  timeScale = timeScale < .8 ? 1 : .5;
+  e.target.textContent = '속도 ' + (timeScale === 1 ? '1×' : '0.5×');
+};
+document.getElementById('bTheme').onclick = function () {
+  applyTheme(themeName === 'dark' ? 'light' : 'dark');
+};
+document.getElementById('zIn').onclick = function () { userZoom = Math.max(.35, userZoom * .8); };
+document.getElementById('zOut').onclick = function () { userZoom = Math.min(4, userZoom * 1.25); };
+document.getElementById('zFit').onclick = resetView;
 function resize() {
-  if (renderer.xr.isPresenting) return;
-  const w = window.innerWidth, h = window.innerHeight;
-  camera.aspect = w / h;
+  if (xrOn) return;                      // 몰입 중에는 컴포지터가 프레임버퍼를 소유한다
+  renderer.setSize(innerWidth, innerHeight, false);
+  camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
-  renderer.setSize(w, h, false);
-  pUniforms.uPR.value = DPR();
 }
-window.addEventListener('resize', resize);
-window.addEventListener('orientationchange', function () { setTimeout(resize, 250); });
+addEventListener('resize', resize); resize();
 
-let fpsAcc = 0, fpsFrames = 0, fpsShown = 0, tuned = 0;
-function autoTune(dt) {
-  fpsAcc += dt; fpsFrames++;
-  if (fpsAcc < 1.0) return;
-  const fps = fpsFrames / fpsAcc;
-  fpsShown = Math.round(fps);
-  fpsAcc = 0; fpsFrames = 0;
-  if (!state.inXR) setStatus(fpsShown + ' FPS', fps < 40 ? 'warn' : '');
+/* ─────────────────────────────────────── 루프 */
+applyTheme(themeName);
+setupBuild();
+var last = performance.now(), reanalyze = 0;
 
-  if (fps < 42 && tuned < 3) {
-    tuned++;
-    state.quality = Math.max(0.35, state.quality - 0.20);
-    applyDensity();
-    if (!state.inXR) renderer.setPixelRatio(Math.max(1, DPR() * (1 - tuned*0.18)));
-  } else if (fps > 58 && tuned > 0) {
-    tuned--;
-    state.quality = Math.min(state.inXR ? 0.78 : 1.0, state.quality + 0.14);
-    applyDensity();
-  }
-}
+renderer.setAnimationLoop(function (now) {
+  now = now || performance.now();
+  var raw = Math.min((now - last) / 1000, .033); last = now;
+  var t = now / 1000;
+  for (var k = 0; k < 2; k++) step(raw * timeScale / 2);
 
-/* =========================================================================
-   13. FRAME LOOP
-   ========================================================================= */
-const parallax = new THREE.Vector2();
-
-function render() {
-  const dt = Math.min(clock.getDelta(), 0.05);
-  const t  = clock.getElapsedTime();
-
-  // Burst envelope: fast attack (set to 1), exponential release
-  state.burst *= Math.pow(0.045, dt);
-  if (state.burst < 0.001) state.burst = 0;
-  coreUniforms.uBurst.value = cageUniforms.uBurst.value =
-    shellUniforms.uBurst.value = discUniforms.uBurst.value = pUniforms.uBurst.value = state.burst;
-
-  coreUniforms.uTime.value = cageUniforms.uTime.value =
-    shellUniforms.uTime.value = discUniforms.uTime.value = pUniforms.uTime.value = t;
-  stars.material.uniforms.uTime.value = t;
-
-  // Inertial spin + idle drift
-  spin.vy *= Math.pow(0.02, dt);
-  spin.vx *= Math.pow(0.02, dt);
-  spin.y += spin.vy + dt * 0.055 * state.pulse;
-  spin.x = THREE.MathUtils.clamp(spin.x + spin.vx, -0.85, 0.85);
-  system.rotation.y = spin.y;
-
-  // Gaze / mouse parallax — smooth, depth-preserving
-  if (!state.inXR) {
-    parallax.x += (pointer.x - parallax.x) * Math.min(1, dt*3.2);
-    parallax.y += (pointer.y - parallax.y) * Math.min(1, dt*3.2);
-    world.rotation.x = spin.x + parallax.y * 0.26;
-    world.rotation.y = parallax.x * 0.34;
-    world.position.x = -parallax.x * 0.30;
-    world.position.y =  WORLD_Y + parallax.y * 0.18;
-    camera.position.z += (dolly - camera.position.z) * Math.min(1, dt*4.0);
-    camera.lookAt(0, 0, 0);
+  if (mode === 'demo') {
+    var lp = P[demo.left];
+    placeTag(tagL, demo.left, '막대 2개<small>삼각형 — 경첩</small>');
+    placeTag(tagR, demo.right, '막대 3개<small>사면체 — 강체</small>');
+    if (lp && lp.y < .5 && !demo.said) {
+      demo.said = true;
+      say('왼쪽이 무너졌다',
+          '막대 2개는 두 점을 잇는 축을 중심으로 <b>접힌다</b>. 오른쪽은 세 점에 이어져 접힐 방향이 아예 없다');
+    }
   } else {
-    world.rotation.x = spin.x * 0.4;
+    if (game.active >= 0) {
+      placeTag(tagL, game.active, '받쳐라<small>막대 ' + stickCount(game.active) + ' / 3</small>', 'call', .55);
+      tagR.classList.remove('on');
+      var ap = P[game.active];
+      if (isLocked(game.active)) {
+        game.active = -1;
+        analyze(); computeSpots();
+        if (maxY() >= GOAL_Y && flowState.up >= GOAL_UP && !game.won) {
+          game.won = true;
+          say('완성 — 위아래가 통한다', '높이 <b>' + maxY().toFixed(1) +
+              '</b> · 상향 <b>' + flowState.up.toFixed(2) + '</b> · 막대 ' + S.length + '개');
+        } else if (!spots.length) {
+          say('막다른 길', '막대가 닿는 범위에 받칠 점이 없다. <b>바닥부터 넓혔어야 한다</b>');
+        } else if (maxY() >= GOAL_Y) {
+          say('높이는 닿았는데 정보가 안 올라온다',
+              '접점이 <b>' + flowState.groundContacts + '개</b> 뿐이다. 바닥 자리를 눌러 <b>넓혀라</b>');
+        } else {
+          say('잠겼다 — 흔들림이 멎었다', '이 점이 새 발판이 된다. 다음 자리를 골라라');
+        }
+      } else if (ap.y < .3) {
+        var dead = game.active;
+        S = S.filter(function (s) { return s.a !== dead && s.b !== dead; });
+        P.splice(dead, 1);
+        S.forEach(function (s) { if (s.a > dead) s.a--; if (s.b > dead) s.b--; });
+        game.active = -1; analyze(); computeSpots();
+        say('무너졌다', '막대 3개가 붙기 전에 바닥에 닿았다. <b>다시 세워보라</b>');
+      }
+    } else { tagL.classList.remove('on'); tagR.classList.remove('on'); }
+    goalRing.position.y = GOAL_Y;
+    reanalyze += raw;
+    if (reanalyze > .25) { reanalyze = 0; analyze(); }
   }
 
-  // Cage + ring choreography
-  for (let i = 0; i < cages.length; i++) {
-    const c = cages[i];
-    c.rotation.y += dt * c.userData.spin * state.pulse;
-    c.rotation.x  = Math.sin(t * 0.25 * state.pulse) * c.userData.tilt;
-  }
-  for (let i = 0; i < rings.length; i++) {
-    rings[i].rotation.z += dt * rings[i].userData.spin * state.pulse;
-    rings[i].rotation.x += dt * rings[i].userData.spin * 0.35 * state.pulse;
-  }
-  disc.rotation.z += dt * 0.10 * state.pulse;
+  syncParticles(raw * timeScale);
 
-  // Shards: orbit + tumble; these carry the shadow pass
-  for (let i = 0; i < shards.length; i++) {
-    const s = shards[i], u = s.userData;
-    u.a += dt * u.sp * state.pulse;
-    const r = u.r * (1 + state.burst*0.5);
-    s.position.set(Math.cos(u.a)*r, u.y + Math.sin(t*0.5*state.pulse + u.a)*0.35, Math.sin(u.a)*r);
-    s.rotation.x += dt * u.rx * state.pulse;
-    s.rotation.y += dt * u.ry * state.pulse;
-  }
+  var h = maxY(), w = avgWobble();
+  document.getElementById('hgt').textContent = h.toFixed(2);
+  document.getElementById('hgtBar').style.width = Math.min(100, h / GOAL_Y * 100) + '%';
+  document.getElementById('wob').textContent = w.toFixed(4);
+  document.getElementById('wobBar').style.width = Math.min(100, w * 2400) + '%';
+  document.getElementById('fUp').textContent = flowState.up.toFixed(2);
+  document.getElementById('fUpBar').style.width = Math.min(100, flowState.up / GOAL_UP * 100) + '%';
+  document.getElementById('fDn').textContent = flowState.down.toFixed(2);
+  document.getElementById('fDnBar').style.width = Math.min(100, flowState.down / 1.4 * 100) + '%';
+  document.getElementById('gc').textContent = flowState.groundContacts;
 
-  // Reactive lighting
-  const lt = t * state.pulse;
-  coreLight.intensity = 3.0 + Math.sin(lt*1.9)*1.0 + state.burst*14.0;
-  orbitLight.position.set(Math.cos(lt*0.7)*2.7, Math.sin(lt*0.45)*1.9, Math.sin(lt*0.7)*2.7);
-  orbitLight.intensity = 1.8 + Math.sin(lt*2.4)*0.6 + state.burst*7.0;
-  rimLight.intensity = 2.0 + state.burst*3.0;
-  renderer.toneMappingExposure = 1.18 + state.burst * 0.55;
-
-  // Spatial panel: face the viewer, keep pinch-drag live
-  if (panel.visible) {
-    pollXRPointers();
-  }
-
-  autoTune(dt);
+  if (xrOn) updateGrab();
+  else { autoFrame(); placeCamera(); }
+  syncMeshes(t);
   renderer.render(scene, camera);
-}
-
-renderer.setAnimationLoop(render);
-
-document.addEventListener('visibilitychange', function () {
-  if (document.hidden) clock.stop(); else clock.start();
 });
-
-/* =========================================================================
-   14. BOOT
-   ========================================================================= */
-setParam('pulse',    1.00, false);
-setParam('density',  0.70, false);
-setParam('spectrum', 208/360, false);
-drawPanel();
-
-negotiateXR().then(function (mode) {
-  state.xrMode = mode;
-  if (mode) {
-    el.enter.disabled = false;
-    el.enter.textContent = 'ENTER SPATIAL REALITY';
-    el.modeTxt.textContent = mode === 'immersive-ar' ? 'AR READY' : 'VR READY';
-    setStatus('XR READY', '');
-    el.hint.textContent = mode === 'immersive-ar'
-      ? '탭하여 코어를 실제 공간으로 투사합니다 · 핀치로 패널 조작'
-      : '탭하여 몰입형 공간 세션을 시작합니다 · 핀치로 패널 조작';
-  } else {
-    el.enter.disabled = true;
-    el.enter.textContent = 'SPATIAL MODE UNAVAILABLE';
-    setStatus('WINDOWED', 'warn');
-    el.hint.textContent = 'WebXR 미지원 브라우저 · 드래그/휠/더블탭으로 조작하세요 (HTTPS + Vision Pro Safari 필요)';
-  }
-}).catch(function () {
-  el.enter.disabled = true;
-  el.enter.textContent = 'SPATIAL MODE UNAVAILABLE';
-  setStatus('WINDOWED', 'warn');
-});
-
-requestAnimationFrame(function () {
-  setTimeout(function () { el.boot.classList.add('gone'); }, 420);
-  setTimeout(function () { el.boot.style.display = 'none'; }, 1500);
-});
-
-})();
 </script>
 </body>
 </html>
